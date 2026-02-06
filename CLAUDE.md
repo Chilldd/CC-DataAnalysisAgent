@@ -2,31 +2,45 @@
 
 DataAnalysisAgent MCP Server - 为 ClaudeCode 提供 Excel 数据读取和图表生成能力。
 
-## 文档
+## 文档优先级
 
-| 文档 | 作用 |
-|------|------|
-| README.md | 用户指南 |
-| FEATURES.md | **功能清单与修改位置** |
-| DESIGN.md | 架构设计、MCP 工具接口 |
-| API.md | 扩展开发指南 |
-| TASKS.md | 待办任务清单 |
+1. **AI_REFERENCE.md** - API schema、模块索引、扩展入口
+2. **CLAUDE.md** (当前文件) - Agent 工作流、行为约束
+3. **README.md** - 用户使用说明
 
-## 工作流
+## AI 行为约束
 
-完成任务后：
-1. **删除** TASKS.md 中的任务
-2. 更新 DESIGN.md（新功能、版本历史）
-3. 更新 README.md（用户可见功能）
-4. 更新 API.md（扩展示例）
-5. 更新 FEATURES.md（功能清单与修改位置）
-6. 思考是否可以有扩展或优化任务，如果有加入到TASKS.md中
+### 必须遵守
+- 所有工具返回必须 JSON 可序列化
+- datetime 自动转 ISO 字符串
+- 大文件使用 usecols + limit 控制 token
+- 禁止返回 DataFrame 或二进制数据
 
-## 命令
+### 工作流
+```
+session_start → get_excel_schema → get_chart_data → generate_chart_html → session_end
+```
+
+### 代码修改后
+- 接口变化 → 更新 AI_REFERENCE.md
+- 使用方式变化 → 更新 README.md
+- Agent 流程变化 → 更新 CLAUDE.md
+
+**禁止只改代码不更新文档**
+
+## 文档职责边界
+
+| 文档 | 用途 | 禁止写入 | 触发更新 |
+|------|------|----------|----------|
+| **README.md** | 用户使用说明、安装配置、功能概览 | 内部架构、Agent规则、API schema、TODO | 新用户可见功能、使用方式改变 |
+| **CLAUDE.md** | Agent工作流、行为约束、开发协议 | API细节、完整功能说明、用户教程 | Agent行为变化、工具接入流程变化 |
+| **AI_REFERENCE.md** | API schema、模块索引、扩展入口 | 使用教程、Agent workflow、TODO | 新接口、新模块、数据结构变更 |
+
+## 快速命令
 
 ```bash
-pip install -e .                      # 安装
-python -m data_analysis_agent        # 运行
+pip install -e .
+python -m data_analysis_agent
 ```
 
 ## 架构
@@ -35,33 +49,11 @@ python -m data_analysis_agent        # 运行
 ClaudeCode → MCP Server → Tools → Core → Files
 ```
 
-| 组件 | 路径 |
-|------|------|
-| ExcelReader | `core/excel_reader.py` |
-| ChartRenderer | `core/chart_renderer.py` |
-| Server | `mcp/server.py` |
+## 扩展入口
 
-## 扩展
-
-| 扩展 | 位置 |
-|------|------|
+| 扩展类型 | 位置 |
+|----------|------|
 | 新工具 | `mcp/tools/` + `mcp/server.py` |
-| 新文件格式 | `core/excel_reader.py:129` |
-| 新聚合函数 | `core/excel_reader.py:230` |
-| 新过滤操作符 | `core/excel_reader.py:196` |
-
-## 数据格式
-
-```json
-// 工具返回
-{"success": true, "data": ...}
-
-// 表格数据
-[["列1", "列2"], ["值1", "值2"]]
-```
-
-## 约束
-
-- 所有返回数据必须 JSON 可序列化
-- datetime 自动转字符串
-- 使用 `limit` 参数控制大文件
+| 新文件格式 | `core/excel_reader.py:_read_file()` |
+| 新聚合函数 | `core/excel_reader.py:_group_and_aggregate()` |
+| 新过滤操作符 | `core/excel_reader.py:_apply_filters()` |
