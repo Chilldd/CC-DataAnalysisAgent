@@ -493,6 +493,31 @@ class ExcelReader:
         # 其他类型（如单个整数）直接返回
         return usecols
 
+    def _normalize_cache_key(self, sheet_name: str, usecols) -> str:
+        """
+        生成标准化的缓存键，列名排序确保一致性
+
+        解决问题：['A','B'] 和 ['B','A'] 应该使用相同的缓存键
+
+        Args:
+            sheet_name: 工作表名称
+            usecols: 列选择参数（解析后）
+
+        Returns:
+            标准化的缓存键字符串
+        """
+        sheet = sheet_name or 'default'
+        if usecols is None:
+            return f"{sheet}:full"
+
+        # 对于字符串列名列表，排序后生成键
+        if isinstance(usecols, list) and usecols and isinstance(usecols[0], str):
+            sorted_cols = sorted(usecols)
+            return f"{sheet}:cols:{','.join(sorted_cols)}"
+
+        # 对于索引列表或其他格式，保持原有逻辑
+        return f"{sheet}:cols:{str(usecols)}"
+
     def _read_file(
         self,
         sheet_name: Optional[str] = None,
@@ -500,15 +525,15 @@ class ExcelReader:
     ) -> pd.DataFrame:
         """读取文件（支持缓存和 LRU 清理）"""
         # 解析 usecols 参数（支持逗号分隔的字符串）
-        usecols = self._parse_usecols(usecols)
+        parsed_usecols = self._parse_usecols(usecols)
 
-        # 生成缓存键
-        usecols_key = str(usecols) if usecols else "all"
-        cache_key = f"{sheet_name or 'default'}:{usecols_key}"
+        # 使用标准化的缓存键
+        cache_key = self._normalize_cache_key(sheet_name, parsed_usecols)
 
         # 检查缓存
         if self.enable_cache:
             mtime = self.file_path.stat().st_mtime
+            # 1. 首先检查精确匹配的缓存
             if cache_key in self._cache:
                 cached_df, cached_mtime = self._cache[cache_key]
                 if cached_mtime == mtime:
@@ -522,6 +547,30 @@ class ExcelReader:
 
                     logger.debug(f"缓存命中: {cache_key} ({self._format_bytes(bytes_read)})")
                     return cached_df.copy()  # 返回副本避免修改缓存
+
+            # 2. 智能缓存共享：当请求列子集时，检查全量缓存是否存在
+            if parsed_usecols is not None:
+                full_key = self._normalize_cache_key(sheet_name, None)
+                if full_key in self._cache:
+                    full_df, full_mtime = self._cache[full_key]
+                    if full_mtime == mtime:
+                        # 从全量缓存提取列子集
+                        try:
+                            subset_df = full_df[parsed_usecols].copy()
+                            # 将子集缓存起来，下次直接命中
+                            self._cache[cache_key] = (subset_df.copy(), mtime)
+                            self._cache.move_to_end(cache_key)
+                            self._cache_hits += 1
+
+                            bytes_read = subset_df.memory_usage(deep=True).sum()
+                            metrics.log_file_read(str(self.file_path), bytes_read, from_cache=True)
+
+                            logger.debug(f"缓存共享命中: {cache_key} <- {full_key} ({self._format_bytes(bytes_read)})")
+                            return subset_df.copy()
+                        except KeyError:
+                            # 请求的列不在全量缓存中，继续读取文件
+                            logger.debug(f"缓存共享失败: 请求的列不在全量缓存中")
+
             self._cache_misses += 1
             logger.debug(f"缓存未命中: {cache_key}")
 
@@ -529,11 +578,13 @@ class ExcelReader:
         logger.debug(f"读取文件: {self.file_path.name}, 格式={suffix}, sheet={sheet_name or 'default'}")
         if suffix in ['.xlsx', '.xls']:
             # 明确指定 sheet_name=0 确保返回单个 DataFrame
+            # 注意：必须使用 parsed_usecols（已解析为列表），而不是原始的 usecols 字符串
+            # pandas read_excel 不接受逗号分隔的字符串作为 usecols 参数
             result = pd.read_excel(
                 self.file_path,
                 sheet_name=sheet_name or 0,
                 engine='openpyxl',
-                usecols=usecols
+                usecols=parsed_usecols
             )
             # 如果返回的是字典（多sheet情况），取第一个
             if isinstance(result, dict):
@@ -541,7 +592,8 @@ class ExcelReader:
             else:
                 df = result
         elif suffix == '.csv':
-            df = pd.read_csv(self.file_path, usecols=usecols)
+            # 注意：必须使用 parsed_usecols（已解析为列表），而不是原始的 usecols 字符串
+            df = pd.read_csv(self.file_path, usecols=parsed_usecols)
         else:
             logger.error(f"不支持的文件格式: {suffix}")
             raise ValueError(f"不支持的文件格式: {suffix}")

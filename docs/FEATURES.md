@@ -2,22 +2,19 @@
 
 ## MCP 工具
 
-### analyze（推荐，v0.7.0 新增）
-一站式智能数据分析工具，自然语言驱动
+### session_start / session_end（v0.8.0 新增）
+会话管理和统计报告
 
 | 项 | 位置 |
 |---|---|
-| 工具定义 | `mcp/tools/analyze.py` |
-| 核心类 | `ExcelReader.query()` |
+| 工具定义 | `mcp/tools/session_start.py` / `session_end.py` |
+| 核心类 | `MetricsLogger` |
 
 **特点**：
-- 接受自然语言分析需求
-- 自动解析分组列、聚合类型、聚合列
-- 返回结构化分析结果
-
-**使用场景**：
-- 快速数据分析："分析各地区销售额排名"
-- 自动统计："统计每个产品类别的平均价格"
+- 会话生命周期管理
+- 数据传输统计（自动记录）
+- 性能分析和优化建议
+- 缓存命中率报告
 
 ---
 
@@ -125,7 +122,112 @@
 
 ---
 
+### batch_get_chart_data（v0.9.0 新增）
+批量获取图表数据（优化版，一次性处理多个查询）
+
+| 项 | 位置 |
+|---|---|
+| 工具定义 | `mcp/tools/batch_get_chart_data.py` |
+| 核心类 | `ExcelReader.query()` |
+| 列推断 | `_extract_columns_from_queries()` |
+
+**特点**：
+- 只读取一次文件，自动推断所有查询需要的列
+- 在内存中执行多个查询，避免重复 I/O
+- 返回详细的性能指标
+
+**性能提升**：
+- 4 个查询：1.36s → 0.35s（3.9x）
+- 推荐用于多图表场景
+
+---
+
 ## 核心功能
+
+### TOON 格式支持 (v0.8.0 新增)
+Token-Oriented Object Notation - 节省 40-70% token 消耗
+
+| 项 | 位置 |
+|---|---|
+| 配置模块 | `core/config.py` |
+| 序列化器 | `core/toon_serializer.py` |
+| 格式转换 | `mcp/server.py:_convert_to_toon()` |
+| 配置文件 | `.data-analysis-agent.toml` |
+
+**特性**：
+- 支持 JSON 和 TOON 格式切换
+- 通过配置文件或环境变量设置
+- 对象数组场景最优（节省约 70%）
+- 自动错误处理（TOON 转换失败时降级到 JSON）
+
+**配置方式**：
+
+1. **配置文件** (`.data-analysis-agent.toml`):
+```toml
+[server]
+response_format = "toon"
+show_format_info = true
+```
+
+2. **环境变量**:
+```bash
+export DAA_RESPONSE_FORMAT=toon
+```
+
+3. **代码中动态设置**:
+```python
+from data_analysis_agent.core import set_response_format
+set_response_format("toon")
+```
+
+**性能对比**：
+
+| 数据类型 | JSON | TOON | 节省 |
+|---------|------|------|------|
+| 对象数组 (100 条) | 15,144 tokens | 8,744 tokens | 42% |
+| 对象数组 (3 条) | 231 字符 | 68 字符 | 70.6% |
+| 简单数据 | 251 字符 | 113 字符 | 55% |
+
+**使用示例**:
+```python
+from data_analysis_agent.core import (
+    to_toon, serialize_result, estimate_token_savings,
+    get_response_format, set_response_format
+)
+
+# 序列化为 TOON 格式
+data = {"users": [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]}
+toon_str = to_toon(data)
+# 输出:
+# users[2]{id,name}:
+#   1,Alice
+#   2,Bob
+
+# 带格式标记的序列化
+result = serialize_result(data, format_type="toon", show_format=True)
+# 输出:
+# ```toon
+# users[2]{id,name}:
+#   1,Alice
+#   2,Bob
+# ```
+
+# 估算 token 节省
+savings = estimate_token_savings(data)
+print(f"节省: {savings['savings_percent']}%")
+
+# 检查和设置格式
+print(f"当前格式: {get_response_format()}")
+set_response_format("toon")
+```
+
+**适用场景**：
+- ✅ **推荐**: 对象数组（数据库查询结果、聚合数据）
+- ✅ **推荐**: 简单键值对数据
+- ❌ **不推荐**: 深度嵌套结构（JSON compact 更高效）
+- ❌ **不推荐**: 纯表格数据（CSV 更小）
+
+---
 
 ### 大文件分块读取 (v0.2.0 新增)
 支持流式处理大型 Excel/CSV 文件
@@ -145,15 +247,22 @@ for chunk in reader.read_chunked(chunksize=5000):
 
 ---
 
-### 智能缓存机制 (v0.3.0 新增, v0.4.0 升级)
-基于文件修改时间的自动缓存，避免重复读取。v0.4.0 新增 LRU 策略和缓存大小限制。
+### 智能缓存机制 (v0.3.0 新增, v0.4.0 升级, v0.9.0 优化)
+基于文件修改时间的自动缓存，避免重复读取。v0.4.0 新增 LRU 策略和缓存大小限制。v0.9.0 新增标准化缓存键和智能缓存共享。
 
 | 项 | 位置 |
 |---|---|
 | 配置 | `ExcelReader.__init__(enable_cache=True, max_cache_size=10)` |
 | 缓存存储 | `_cache`, `_row_count_cache` (OrderedDict) |
 | LRU 清理 | `_read_file()` |
-| 行号 | ~13, ~316 |
+| 标准化缓存键 | `_normalize_cache_key()` (v0.9.0) |
+| 智能缓存共享 | `_read_file()` (v0.9.0) |
+| 行号 | ~13, ~316, ~496 |
+
+**v0.9.0 优化**：
+- 缓存键标准化：列名排序确保一致性
+- 智能缓存共享：从全量缓存提取列子集
+- 缓存命中率：20% → 80%+
 
 **使用示例**:
 ```python
@@ -161,6 +270,10 @@ for chunk in reader.read_chunked(chunksize=5000):
 reader = ExcelReader("data.xlsx", max_cache_size=20)
 data1 = reader.read()  # 第一次读取，从文件加载
 data2 = reader.read()  # 第二次读取，从缓存获取（文件未修改）
+
+# 缓存共享：先读取全量，再读取列子集会自动从缓存提取
+data_all = reader.read()  # 缓存全量数据
+data_subset = reader.read(usecols=["A", "B"])  # 从全量缓存提取
 
 # 获取缓存统计
 info = reader.get_cache_info()
@@ -302,7 +415,11 @@ reset_metrics()
 | 项 | 位置 |
 |---|---|
 | 方法 | `ExcelReader._read_file()` |
-| 行号 | ~129 |
+| 行号 | ~521 |
+
+**v0.9.1 修复**:
+- 修复 `usecols` 参数传递问题（原传递原始字符串而非解析后的列表）
+- pandas read_excel/read_csv 不接受逗号分隔的字符串，必须传递列表
 
 **新增格式**: 在该方法中添加新的 `elif` 分支
 
@@ -452,4 +569,6 @@ MCP 服务器主入口
 | 清空缓存 | `ExcelReader.clear_cache()` |
 | 修改图表样式 | `core/chart_renderer.py` 模板部分 |
 | 修改返回数据格式 | 对应工具的处理函数 |
+| 设置 TOON 格式 | `.data-analysis-agent.toml` 或环境变量 `DAA_RESPONSE_FORMAT` |
+| TOON 序列化 | `core/toon_serializer.py` |
 | 添加依赖 | `pyproject.toml` |

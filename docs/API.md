@@ -133,6 +133,116 @@ class MyCustomReader:
 
 ---
 
+## 批量查询 API (v0.9.0 新增)
+
+### batch_get_chart_data
+
+批量处理多个图表数据查询，显著提升性能。
+
+**参数**:
+```typescript
+{
+  file_path: string;        // Excel 文件路径
+  sheet_name?: string;      // 工作表名称（可选）
+  usecols?: string;         // 要读取的列（逗号分隔，可选）
+  queries: Array<{          // 查询列表
+    group_by: string;       // 分组列名（必需）
+    aggregation: string;    // 聚合函数（必需）
+    aggregate_column?: string;  // 聚合列名（count 时可选）
+    filters?: Array<{       // 过滤条件（可选）
+      column: string;
+      operator: string;
+      value: any;
+    }>;
+    order_by?: string;      // 排序列名（可选）
+    order?: "asc" | "desc"; // 排序方向（可选）
+    limit?: number;         // 返回的最大分组数（可选）
+  }>;
+}
+```
+
+**返回**:
+```json
+{
+  "success": true,
+  "results": [
+    {
+      "query_index": 0,
+      "success": true,
+      "data": {...},
+      "query_time_ms": 50
+    }
+  ],
+  "summary": {
+    "total_queries": 2,
+    "successful_queries": 2,
+    "read_time_ms": 200,
+    "total_query_time_ms": 100,
+    "total_time_ms": 300,
+    "avg_time_per_query": 150
+  }
+}
+```
+
+**使用示例**:
+```python
+# 单个工具调用处理多个图表
+result = await handle_batch_get_chart_data(
+    file_path="sales.xlsx",
+    queries=[
+        {"group_by": "地区", "aggregation": "sum", "aggregate_column": "销售额"},
+        {"group_by": "产品", "aggregation": "count"},
+        {"group_by": "月份", "aggregation": "avg", "aggregate_column": "利润"}
+    ]
+)
+# 性能：1 次文件读取 + 3 次内存查询 ≈ 350ms
+# vs 3 次独立调用 ≈ 1360ms
+```
+
+---
+
+## 缓存优化 API (v0.9.0 新增)
+
+### 标准化缓存键
+
+缓存键现在自动标准化，确保列顺序不影响缓存命中：
+
+```python
+# 这两个调用现在使用相同的缓存键
+reader._read_file(usecols=['A', 'B'])
+reader._read_file(usecols=['B', 'A'])
+# 缓存键格式: "default:cols:A,B"（列名已排序）
+```
+
+### 智能缓存共享
+
+当请求列子集时，自动从全量缓存提取：
+
+```python
+# 第一次读取全量数据
+df_all = reader.read()  # 缓存全量数据
+
+# 第二次读取列子集（自动从缓存提取）
+df_subset = reader.read(usecols=['A', 'B'])  # 从全量缓存提取，无需重新读取文件
+```
+
+### 缓存统计
+
+获取缓存性能指标：
+
+```python
+info = reader.get_cache_info()
+# {
+#     'hit_rate': 85.5,           # 命中率（百分比）
+#     'cache_hits': 12,           # 命中次数
+#     'cache_misses': 2,          # 未命中次数
+#     'cache_memory_mb': 2.5,     # 缓存内存占用
+#     'data_cache_count': 3       # 缓存条目数
+# }
+```
+
+---
+
 ## 扩展点
 
 ### 添加新工具

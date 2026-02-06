@@ -16,6 +16,19 @@ from .reader_manager import (
     get_reader_stats,
     clear_reader
 )
+from .config import (
+    get_config,
+    reload_config,
+    set_response_format,
+    get_response_format,
+    is_toon_enabled,
+    ServerConfig
+)
+from .toon_serializer import (
+    to_toon,
+    serialize_result,
+    estimate_token_savings
+)
 
 __all__ = [
     'get_logger',
@@ -29,5 +42,14 @@ __all__ = [
     'ReaderManager',
     'get_reader',
     'get_reader_stats',
-    'clear_reader'
+    'clear_reader',
+    'get_config',
+    'reload_config',
+    'set_response_format',
+    'get_response_format',
+    'is_toon_enabled',
+    'ServerConfig',
+    'to_toon',
+    'serialize_result',
+    'estimate_token_savings'
 ]

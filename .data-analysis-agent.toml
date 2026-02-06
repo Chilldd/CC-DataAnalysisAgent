@@ -1,0 +1,10 @@
+# DataAnalysisAgent MCP Server 配置文件
+# 将此文件复制到项目根目录或 ~/.config/data-analysis-agent/config.toml
+
+[server]
+# 返回数据格式: "json" 或 "toon"
+# TOON 格式可节省约 40-70% 的 token 消耗
+response_format = "toon"
+
+# 是否在输出中显示格式标记（如 ```toon 代码块）
+show_format_info = true

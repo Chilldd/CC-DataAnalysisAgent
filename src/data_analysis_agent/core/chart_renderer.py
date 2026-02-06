@@ -361,50 +361,53 @@ class ChartRenderer:
             if chart_type == "pie" and "legend" not in result:
                 result["legend"] = {"orient": "vertical", "left": "left"}
 
-            # 对于柱状图/折线图，确保有坐标轴
-            if chart_type in ["bar", "line", "scatter"] and "xAxis" not in result and "yAxis" not in result:
-                data = series.get("data", [])
-                if data and isinstance(data, list):
-                    # 检查数据格式
-                    has_object_with_name = any(isinstance(item, dict) and "name" in item for item in data)
-                    has_array_items = any(isinstance(item, (list, tuple)) for item in data)
+            # 对于柱状图/折线图，确保有完整的坐标轴
+            if chart_type in ["bar", "line", "scatter"]:
+                # 确保 yAxis 存在（即使已有 xAxis，也要检查 yAxis）
+                if "yAxis" not in result:
+                    result["yAxis"] = {"type": "value"}
 
-                    if has_object_with_name:
-                        # 对象格式: [{"name": "A", "value": 10}, ...]
-                        categories = [item.get("name") for item in data if isinstance(item, dict) and "name" in item]
-                        values = [item.get("value", item.get("y", 0)) for item in data if isinstance(item, dict)]
-                        if categories and values:
-                            result["xAxis"] = {"type": "category", "data": categories}
-                            result["yAxis"] = {"type": "value"}
-                            series["data"] = values
-                    elif has_array_items:
-                        # 二维数组格式: [["A", 10], ["B", 20]] 或 [[x1, y1], [x2, y2]]
-                        has_string_first = any(isinstance(item[0], str) for item in data if isinstance(item, (list, tuple)) and len(item) >= 2)
-                        if has_string_first and chart_type != "scatter":
-                            # 类别数据: [["A", 10], ["B", 20]]
-                            categories = [item[0] for item in data if isinstance(item, (list, tuple)) and len(item) >= 2]
-                            values = [item[1] for item in data if isinstance(item, (list, tuple)) and len(item) >= 2]
-                            result["xAxis"] = {"type": "category", "data": categories}
-                            result["yAxis"] = {"type": "value"}
-                            series["data"] = values
-                        else:
-                            # 数值坐标数据: [[x1, y1], [x2, y2]]
+                # 如果没有 xAxis，根据数据生成
+                if "xAxis" not in result:
+                    data = series.get("data", [])
+                    if data and isinstance(data, list):
+                        # 检查数据格式
+                        has_object_with_name = any(isinstance(item, dict) and "name" in item for item in data)
+                        has_array_items = any(isinstance(item, (list, tuple)) for item in data)
+
+                        if has_object_with_name:
+                            # 对象格式: [{"name": "A", "value": 10}, ...]
+                            categories = [item.get("name") for item in data if isinstance(item, dict) and "name" in item]
+                            values = [item.get("value", item.get("y", 0)) for item in data if isinstance(item, dict)]
+                            if categories and values:
+                                result["xAxis"] = {"type": "category", "data": categories}
+                                series["data"] = values
+                        elif has_array_items:
+                            # 二维数组格式: [["A", 10], ["B", 20]] 或 [[x1, y1], [x2, y2]]
+                            has_string_first = any(isinstance(item[0], str) for item in data if isinstance(item, (list, tuple)) and len(item) >= 2)
+                            if has_string_first and chart_type != "scatter":
+                                # 类别数据: [["A", 10], ["B", 20]]
+                                categories = [item[0] for item in data if isinstance(item, (list, tuple)) and len(item) >= 2]
+                                values = [item[1] for item in data if isinstance(item, (list, tuple)) and len(item) >= 2]
+                                result["xAxis"] = {"type": "category", "data": categories}
+                                series["data"] = values
+                            else:
+                                # 数值坐标数据: [[x1, y1], [x2, y2]]
+                                result["xAxis"] = {"type": "value", "scale": True}
+                                result["yAxis"] = {"type": "value", "scale": True}
+                        elif chart_type == "scatter":
+                            # 散点图需要确保有坐标轴
                             result["xAxis"] = {"type": "value", "scale": True}
                             result["yAxis"] = {"type": "value", "scale": True}
-                    elif chart_type == "scatter":
-                        # 散点图需要确保有坐标轴
-                        result["xAxis"] = {"type": "value", "scale": True}
-                        result["yAxis"] = {"type": "value", "scale": True}
-                    else:
-                        # 纯数值数组或未知格式，添加默认坐标轴
-                        result["xAxis"] = {"type": "category", "data": list(range(len(data)))}
-                        result["yAxis"] = {"type": "value"}
+                        else:
+                            # 纯数值数组或未知格式，添加默认坐标轴
+                            result["xAxis"] = {"type": "category", "data": list(range(len(data)))}
 
-                    # 更新 series
-                    if isinstance(result["series"], list):
-                        result["series"][0] = series
-                    else:
-                        result["series"] = series
+                        # 更新 series
+                        if isinstance(result["series"], list):
+                            result["series"][0] = series
+                        else:
+                            result["series"] = series
 
         return result
 

@@ -37,11 +37,13 @@ session_start → get_excel_schema → 选择列 → get_chart_data → session_
 - column_count: 列数
 - suggested_dimensions: 建议的维度列（唯一值 < 50 的列）
 - suggested_metrics: 建议的指标列（数值类型的列）
+- columns_info: 详细的列信息（数据类型、唯一值数量等）
 
 优势：
 - 比 get_excel_info 返回更少数据（节省 token）
 - 自动推荐维度列和指标列
-- 包含完整工作流指引""",
+- 包含完整工作流指引
+- 支持 usecols 参数只获取指定列的信息，进一步减少数据传输""",
     inputSchema={
         "type": "object",
         "properties": {
@@ -52,6 +54,10 @@ session_start → get_excel_schema → 选择列 → get_chart_data → session_
             "sheet_name": {
                 "type": "string",
                 "description": "工作表名称（可选，默认第一个）"
+            },
+            "usecols": {
+                "type": "string",
+                "description": "只获取指定列的信息（逗号分隔的列名，可选）"
             }
         },
         "required": ["file_path"]
@@ -61,7 +67,8 @@ session_start → get_excel_schema → 选择列 → get_chart_data → session_
 
 async def handle_get_excel_schema(
     file_path: str = None,
-    sheet_name: str = None
+    sheet_name: str = None,
+    usecols: str = None
 ) -> list[TextContent]:
     """
     处理 get_excel_schema 请求
@@ -69,6 +76,7 @@ async def handle_get_excel_schema(
     Args:
         file_path: Excel 文件路径
         sheet_name: 工作表名称（可选）
+        usecols: 只获取指定列的信息（可选）
 
     Returns:
         包含数据结构信息的 TextContent 列表（紧凑格式）
@@ -88,8 +96,8 @@ async def handle_get_excel_schema(
     try:
         reader = get_reader(file_path)
 
-        # 只读取前两行（表头 + 第一行数据）
-        df = reader._read_file(sheet_name)
+        # 只读取需要的列（如果指定了 usecols）
+        df = reader._read_file(sheet_name, usecols=usecols)
 
         # 获取基本信息
         headers = df.columns.tolist()
@@ -105,6 +113,7 @@ async def handle_get_excel_schema(
         sample_df = df.head(min(100, len(df)))
         suggested_dimensions = []
         suggested_metrics = []
+        columns_info = {}
 
         for col in headers:
             dtype = df[col].dtype
@@ -117,6 +126,14 @@ async def handle_get_excel_schema(
             elif unique_count < 50:
                 suggested_dimensions.append(col)
 
+            # 详细的列信息
+            columns_info[col] = {
+                "type": str(dtype),
+                "unique_count": int(unique_count),
+                "is_dimension": col in suggested_dimensions,
+                "is_metric": col in suggested_metrics
+            }
+
         # 紧凑格式返回（确保所有值都是 JSON 可序列化的）
         result = {
             "success": True,
@@ -126,6 +143,7 @@ async def handle_get_excel_schema(
             "column_count": int(len(headers)),
             "suggested_dimensions": suggested_dimensions,
             "suggested_metrics": suggested_metrics,
+            "columns_info": columns_info,
             "_workflow": "1. 调用此工具了解结构 -> 2. 选择列 -> 3. 调用 get_chart_data(usecols=[...])"
         }
 

@@ -1,12 +1,13 @@
 [project]
 name = "data-analysis-agent"
-version = "0.7.0"
-description = "MCP Server for Excel data analysis and chart generation"
+version = "0.8.0"
+description = "MCP Server for Excel data analysis and chart generation with TOON format support"
 requires-python = ">=3.10"
 dependencies = [
     "mcp>=0.1.0",
     "pandas>=2.1.0",
     "openpyxl>=3.1.0",
+    "tomli>=2.0.0",
 ]
 
 [project.scripts]

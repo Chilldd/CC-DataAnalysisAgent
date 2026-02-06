@@ -69,6 +69,9 @@ async def handle_session_end(session_id: str = None) -> list[TextContent]:
     metrics = get_metrics()
     metrics_summary = metrics.get_summary()
 
+    # 输出日志摘要
+    metrics.log_summary()
+
     # 获取 reader 统计
     try:
         reader_stats = get_reader_stats()
@@ -163,9 +166,14 @@ def _format_duration(seconds: float) -> str:
 def _parse_bytes(size_str: str) -> int:
     """解析字节字符串为字节数"""
     size_str = size_str.strip().upper()
-    for unit, multiplier in [('B', 1), ('KB', 1024), ('MB', 1024**2), ('GB', 1024**3)]:
-        if unit in size_str:
-            return float(size_str.replace(unit, '')) * multiplier
+    # 按长度降序检查单位，避免 'K' 匹配到 'KB' 的情况
+    for unit, multiplier in [('GB', 1024**3), ('MB', 1024**2), ('KB', 1024), ('K', 1024), ('B', 1)]:
+        if size_str.endswith(unit):
+            num_str = size_str[:-len(unit)].strip()
+            try:
+                return float(num_str) * multiplier
+            except ValueError:
+                continue
     return 0
 
 
