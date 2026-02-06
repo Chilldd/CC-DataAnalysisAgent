@@ -147,16 +147,17 @@ ClaudeCode → MCP Server → Tools → Core (ExcelReader/ChartRenderer) → Fil
   usecols?: string;             // v0.6.0: 列选择优化
   filters?: Array<{
     column: string;
-    operator: string;
+    operator: string;           // v0.12.0: 支持 in, not_in, is_null, is_not_null, starts_with, ends_with, regex
     value: any;
   }>;
   group_by?: string;
-  aggregation?: "sum" | "avg" | "count" | "min" | "max";
+  aggregation?: "sum" | "avg" | "count" | "min" | "max" | "median" | "std" | "var" | "first" | "last" | "nunique" | "percentile25" | "percentile75" | "percentile90" | "mode" | "cumsum" | "cummax" | "cummin" | "rolling_avg";  // v0.11.0, v0.12.0
   aggregate_column?: string;
   order_by?: string;
   order?: "asc" | "desc";
   limit?: number;
   sheet_name?: string;
+  window?: number;              // v0.12.0: rolling_avg 的窗口大小
 }
 ```
 
@@ -223,6 +224,14 @@ ClaudeCode → MCP Server → Tools → Core (ExcelReader/ChartRenderer) → Fil
 | first | 第一個值 | 同上 (v0.11.0) |
 | last | 最後一個值 | 同上 (v0.11.0) |
 | nunique | 唯一值计数 | 同上 (v0.11.0) |
+| percentile25 | 第 25 百分位数 | 同上 (v0.12.0) |
+| percentile75 | 第 75 百分位数 | 同上 (v0.12.0) |
+| percentile90 | 第 90 百分位数 | 同上 (v0.12.0) |
+| mode | 众数 | 同上 (v0.12.0) |
+| cumsum | 累计求和 | 同上 (v0.12.0) |
+| cummax | 累计最大值 | 同上 (v0.12.0) |
+| cummin | 累计最小值 | 同上 (v0.12.0) |
+| rolling_avg | 移动平均（需 window 参数） | 同上 (v0.12.0) |
 
 ### 过滤操作符
 | 操作符 | 描述 | 位置 |
@@ -231,6 +240,13 @@ ClaudeCode → MCP Server → Tools → Core (ExcelReader/ChartRenderer) → Fil
 | != | 不等于 | 同上 |
 | >, <, >=, <= | 比较 | 同上 |
 | contains | 包含字符串 | 同上 |
+| starts_with | 以...开头 | 同上 (v0.12.0) |
+| ends_with | 以...结尾 | 同上 (v0.12.0) |
+| regex | 正则表达式匹配 | 同上 (v0.12.0) |
+| in | 在列表中 | 同上 (v0.12.0) |
+| not_in | 不在列表中 | 同上 (v0.12.0) |
+| is_null | 为空 | 同上 (v0.12.0) |
+| is_not_null | 不为空 | 同上 (v0.12.0) |
 
 ### 列类型映射
 ```
@@ -324,6 +340,7 @@ export DAA_SHOW_FORMAT_INFO=true
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| **0.12.0** | 2026-02-06 | **功能增强**：扩展过滤操作符，新增 in、not_in、is_null、is_not_null、starts_with、ends_with、regex；扩展聚合函数进阶，新增 percentile25/75/90（百分位数）、mode（众数）、cumsum/cummax/cummin（累计聚合）、rolling_avg（移动平均，需 window 参数） |
 | **0.11.0** | 2026-02-06 | **功能增强**：扩展聚合函数，新增 median（中位数）、std（标准差）、var（方差）、first（第一个值）、last（最后一个值）、nunique（唯一值计数）；count 和 nunique 支持不指定 aggregate_column |
 | **0.10.1** | 2026-02-06 | **Bug 修复**：修复 metadata 预加载模式导致数据只有 1 行的问题；`preload_files()` 在 metadata 模式下使用 `read_head(n=5)` 获取样本并清除缓存；移除 `generate_chart_html` 的 `show_data_table` 参数，强制不显示数据表格 |
 | **0.10.0** | 2026-02-06 | **首次加载优化**：`session_start` 新增 `preload_files` 参数；新增 `preload_mode` 参数（metadata/full）；`ReaderManager` 新增 `preload_files()` 方法；首次调用 `get_excel_schema` 性能提升 600 倍 |

@@ -152,6 +152,14 @@ session_start({
 **v0.6.0 新增**：
 - `usecols` 参数支持列选择，减少 token 消耗
 
+**v0.11.0 新增**：
+- 扩展聚合函数：median（中位数）、std（标准差）、var（方差）、first、last、nunique
+
+**v0.12.0 新增**：
+- 扩展过滤操作符：in、not_in、is_null、is_not_null、starts_with、ends_with、regex
+- 扩展聚合函数：percentile25/75/90（百分位数）、mode（众数）、cumsum/cummax/cummin（累计聚合）、rolling_avg（移动平均）
+- `window` 参数：用于 rolling_avg 指定窗口大小
+
 ### batch_get_chart_data（v0.9.0 新增）
 
 批量获取图表数据，一次性处理多个查询

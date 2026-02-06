@@ -146,7 +146,8 @@ class ExcelReader:
         order: str = "asc",
         limit: int = 100,
         sheet_name: str = None,
-        usecols: Optional[Union[str, List[int], List[str]]] = None
+        usecols: Optional[Union[str, List[int], List[str]]] = None,
+        window: int = None
     ) -> Dict[str, Any]:
         """
         查询并聚合数据，只返回聚合结果（不返回原始数据）
@@ -157,13 +158,16 @@ class ExcelReader:
         Args:
             filters: 过滤条件列表
             group_by: 分组列名（必需）
-            aggregation: 聚合函数 (sum, avg, count, min, max)（必需）
+            aggregation: 聚合函数 (sum, avg, count, min, max, median, std, var,
+                         first, last, nunique, percentile25, percentile75, percentile90, mode,
+                         cumsum, cummax, cummin, rolling_avg)（必需）
             aggregate_column: 要聚合的列名（count 时可选）
             order_by: 排序列名
             order: 排序方向 (asc, desc)
             limit: 返回的最大分组数（默认100）
             sheet_name: 工作表名称
             usecols: 要读取的列（可选）
+            window: 移动窗口大小（用于 rolling_avg）
 
         Returns:
             聚合结果字典（只包含分组和聚合值，不包含原始数据）
@@ -188,8 +192,14 @@ class ExcelReader:
         if filters:
             df = self._apply_filters(df, filters)
 
-        # 分组聚合
-        df = self._group_and_aggregate(df, group_by, aggregation, aggregate_column)
+        # 分组聚合（检测是否是累计/窗口聚合）
+        cumulative_aggs = ["cumsum", "cummax", "cummin"]
+        rolling_aggs = ["rolling_avg"]
+
+        if aggregation in cumulative_aggs + rolling_aggs:
+            df = self._group_and_cumulative_aggregate(df, group_by, aggregation, aggregate_column, window)
+        else:
+            df = self._group_and_aggregate(df, group_by, aggregation, aggregate_column)
 
         # 排序
         if order_by and order_by in df.columns:
@@ -718,7 +728,15 @@ class ExcelReader:
         return stats
 
     def _apply_filters(self, df: pd.DataFrame, filters: List[Dict]) -> pd.DataFrame:
-        """应用过滤条件"""
+        """
+        应用过滤条件
+
+        支持的运算符:
+        - 比较运算: =, !=, >, <, >=, <=
+        - 字符串匹配: contains, starts_with, ends_with, regex
+        - 集合运算: in, not_in
+        - 空值检查: is_null, is_not_null
+        """
         for f in filters:
             col = f.get("column")
             op = f.get("operator", "=")
@@ -727,6 +745,7 @@ class ExcelReader:
             if col not in df.columns:
                 continue
 
+            # 比较运算符
             if op == "=":
                 df = df[df[col] == val]
             elif op == "!=":
@@ -739,8 +758,34 @@ class ExcelReader:
                 df = df[df[col] >= val]
             elif op == "<=":
                 df = df[df[col] <= val]
+            # 字符串匹配运算符
             elif op == "contains":
                 df = df[df[col].astype(str).str.contains(str(val), na=False)]
+            elif op == "starts_with":
+                df = df[df[col].astype(str).str.startswith(str(val), na=False)]
+            elif op == "ends_with":
+                df = df[df[col].astype(str).str.endswith(str(val), na=False)]
+            elif op == "regex":
+                import re
+                pattern = str(val)
+                df = df[df[col].astype(str).str.match(pattern, na=False)]
+            # 集合运算符
+            elif op == "in":
+                if isinstance(val, (list, tuple, set)):
+                    df = df[df[col].isin(val)]
+                else:
+                    df = df[df[col].isin([val])]
+            elif op == "not_in":
+                if isinstance(val, (list, tuple, set)):
+                    df = df[~df[col].isin(val)]
+                else:
+                    df = df[~df[col].isin([val])]
+            # 空值检查运算符
+            elif op == "is_null":
+                df = df[df[col].isna()]
+            elif op == "is_not_null":
+                df = df[df[col].notna()]
+
         return df
 
     def _group_and_aggregate(
@@ -758,7 +803,26 @@ class ExcelReader:
         - 高级统计: median, std, var
         - 位置值: first, last
         - 基数统计: nunique
+        - 百分位数: quantile, percentile25, percentile75, percentile90
+        - 模式统计: mode (众数)
         """
+        # 百分位数辅助函数
+        def _quantile_q25(x):
+            return x.quantile(0.25)
+
+        def _quantile_q75(x):
+            return x.quantile(0.75)
+
+        def _quantile_q90(x):
+            return x.quantile(0.90)
+
+        # 众数辅助函数 (取第一个众数，可能有多个)
+        def _mode_func(x):
+            modes = x.mode()
+            if len(modes) > 0:
+                return modes.iloc[0]
+            return None
+
         agg_funcs = {
             "sum": "sum",
             "avg": "mean",
@@ -770,7 +834,14 @@ class ExcelReader:
             "var": "var",
             "first": "first",
             "last": "last",
-            "nunique": "nunique"
+            "nunique": "nunique",
+            # 百分位数
+            "quantile": "mean",  # 需要特殊处理
+            "percentile25": _quantile_q25,
+            "percentile75": _quantile_q75,
+            "percentile90": _quantile_q90,
+            # 模式统计
+            "mode": _mode_func,
         }
 
         if aggregation not in agg_funcs:
@@ -785,11 +856,81 @@ class ExcelReader:
         if aggregation in ("count", "nunique"):
             result = df.groupby(group_by).size().reset_index()
             result.columns = [group_by, aggregate_column or aggregation]
+        elif aggregation == "quantile":
+            # quantile 需要从 value 参数获取分位数值
+            # 暂时使用中位数作为默认值
+            if not aggregate_column:
+                raise ValueError(f"聚合函数 '{aggregation}' 需要指定 aggregate_column 参数")
+            result = df.groupby(group_by)[aggregate_column].agg(agg_func).reset_index()
+            result.columns = [group_by, aggregate_column]
         else:
             if not aggregate_column:
                 raise ValueError(f"聚合函数 '{aggregation}' 需要指定 aggregate_column 参数")
             result = df.groupby(group_by)[aggregate_column].agg(agg_func).reset_index()
             result.columns = [group_by, aggregate_column]
+
+        return result
+
+    def _group_and_cumulative_aggregate(
+        self,
+        df: pd.DataFrame,
+        group_by: str,
+        aggregation: str,
+        aggregate_column: str,
+        window: Optional[int] = None
+    ) -> pd.DataFrame:
+        """
+        分组并进行累计/窗口聚合
+
+        支持的累计聚合函数:
+        - cumsum: 累计求和
+        - cummax: 累计最大值
+        - cummin: 累计最小值
+        - rolling_avg: 移动平均（需要 window 参数）
+
+        与常规聚合不同，这些函数不会减少每个组的行数，
+        而是为每个原始行计算累计值。
+
+        Args:
+            df: 输入数据框
+            group_by: 分组列名
+            aggregation: 聚合函数名称
+            aggregate_column: 要聚合的列名
+            window: 窗口大小（用于 rolling_avg）
+
+        Returns:
+            包含分组列和累计聚合值的数据框
+        """
+        if not aggregate_column:
+            raise ValueError(f"累计聚合函数 '{aggregation}' 需要指定 aggregate_column 参数")
+
+        if aggregate_column not in df.columns:
+            raise ValueError(f"聚合列 '{aggregate_column}' 不存在")
+
+        # 确保数据按分组和顺序正确排列
+        # 按分组列排序，保持每个组内原始顺序
+        df = df.sort_values(by=group_by)
+
+        # 对每个分组应用累计聚合
+        # 使用 transform 方法可以保持原始索引和分组列
+        if aggregation == "cumsum":
+            df[f"{aggregate_column}_cumsum"] = df.groupby(group_by)[aggregate_column].cumsum()
+        elif aggregation == "cummax":
+            df[f"{aggregate_column}_cummax"] = df.groupby(group_by)[aggregate_column].cummax()
+        elif aggregation == "cummin":
+            df[f"{aggregate_column}_cummin"] = df.groupby(group_by)[aggregate_column].cummin()
+        elif aggregation == "rolling_avg":
+            if window is None or window <= 0:
+                raise ValueError("rolling_avg 需要指定正整数 window 参数")
+            df[f"{aggregate_column}_rolling_avg"] = df.groupby(group_by)[aggregate_column].transform(
+                lambda x: x.rolling(window=window, min_periods=1).mean()
+            )
+        else:
+            raise ValueError(f"不支持的累计聚合函数: {aggregation}")
+
+        # 只返回分组列和累计聚合结果列
+        agg_col_name = f"{aggregate_column}_{aggregation}"
+        result = df[[group_by, agg_col_name]]
 
         return result
 

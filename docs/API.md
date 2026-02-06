@@ -325,21 +325,29 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 | 新聚合函数 | `_group_and_aggregate` | 添加新的聚合函数 |
 | 新过滤操作符 | `_apply_filters` | 添加新的过滤操作符 |
 
-#### 支持的聚合函数 (v0.11.0)
+#### 支持的聚合函数 (v0.11.0, v0.12.0)
 
-| 类别 | 函数 | 描述 | 是否需要 aggregate_column |
-|------|------|------|-------------------------|
-| 基础统计 | sum | 求和 | 是 |
-| | avg | 平均值 | 是 |
-| | count | 计数 | 否 (可选) |
-| | min | 最小值 | 是 |
-| | max | 最大值 | 是 |
-| 高级统计 | median | 中位数 | 是 |
-| | std | 标准差 | 是 |
-| | var | 方差 | 是 |
-| 位置值 | first | 第一个值 | 是 |
-| | last | 最后一个值 | 是 |
-| 基数统计 | nunique | 唯一值计数 | 否 (可选) |
+| 类别 | 函数 | 描述 | 是否需要 aggregate_column | 版本 |
+|------|------|------|-------------------------|------|
+| 基础统计 | sum | 求和 | 是 | - |
+| | avg | 平均值 | 是 | - |
+| | count | 计数 | 否 (可选) | - |
+| | min | 最小值 | 是 | - |
+| | max | 最大值 | 是 | - |
+| 高级统计 | median | 中位数 | 是 | v0.11.0 |
+| | std | 标准差 | 是 | v0.11.0 |
+| | var | 方差 | 是 | v0.11.0 |
+| 位置值 | first | 第一个值 | 是 | v0.11.0 |
+| | last | 最后一个值 | 是 | v0.11.0 |
+| 基数统计 | nunique | 唯一值计数 | 否 (可选) | v0.11.0 |
+| 百分位数 | percentile25 | 第 25 百分位数 | 是 | v0.12.0 |
+| | percentile75 | 第 75 百分位数 | 是 | v0.12.0 |
+| | percentile90 | 第 90 百分位数 | 是 | v0.12.0 |
+| 模式统计 | mode | 众数 | 是 | v0.12.0 |
+| 累计聚合 | cumsum | 累计求和 | 是 | v0.12.0 |
+| | cummax | 累计最大值 | 是 | v0.12.0 |
+| | cummin | 累计最小值 | 是 | v0.12.0 |
+| 移动平均 | rolling_avg | 移动平均 | 是（需 window 参数） | v0.12.0 |
 
 **添加文件格式**:
 ```python
@@ -357,20 +365,38 @@ agg_funcs = {
     "count": "count",
     "min": "min",
     "max": "max",
-    "median": "median",  # v0.11.0 新增
-    "std": "std",        # v0.11.0 新增
-    "var": "var",        # v0.11.0 新增
-    "first": "first",    # v0.11.0 新增
-    "last": "last",      # v0.11.0 新增
-    "nunique": "nunique" # v0.11.0 新增
+    "median": "median",      # v0.11.0 新增
+    "std": "std",            # v0.11.0 新增
+    "var": "var",            # v0.11.0 新增
+    "first": "first",        # v0.11.0 新增
+    "last": "last",          # v0.11.0 新增
+    "nunique": "nunique",    # v0.11.0 新增
+    "percentile25": _quantile_q25,  # v0.12.0 新增
+    "percentile75": _quantile_q75,  # v0.12.0 新增
+    "percentile90": _quantile_q90,  # v0.12.0 新增
+    "mode": _mode_func,      # v0.12.0 新增
 }
 ```
 
 **添加过滤操作符**:
 ```python
 # 在 _apply_filters 方法中添加
+
+# v0.12.0 新增操作符
 elif op == "in":
     df = df[df[col].isin(val)]
+elif op == "not_in":
+    df = df[~df[col].isin(val)]
+elif op == "is_null":
+    df = df[df[col].isna()]
+elif op == "is_not_null":
+    df = df[df[col].notna()]
+elif op == "starts_with":
+    df = df[df[col].astype(str).str.startswith(str(val), na=False)]
+elif op == "ends_with":
+    df = df[df[col].astype(str).str.endswith(str(val), na=False)]
+elif op == "regex":
+    df = df[df[col].astype(str).str.match(str(val), na=False)]
 ```
 
 同时更新 `tools/get_chart_data.py` 的 inputSchema。

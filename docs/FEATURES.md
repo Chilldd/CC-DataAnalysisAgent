@@ -141,6 +141,16 @@ result = await handle_session_start(
 - **高级统计**: median（中位数）, std（标准差）, var（方差）[v0.11.0]
 - **位置值**: first（第一个值）, last（最后一个值）[v0.11.0]
 - **基数统计**: nunique（唯一值计数）[v0.11.0]
+- **百分位数**: percentile25, percentile75, percentile90 [v0.12.0]
+- **模式统计**: mode（众数）[v0.12.0]
+- **累计聚合**: cumsum（累计求和）, cummax（累计最大值）, cummin（累计最小值）[v0.12.0]
+- **移动平均**: rolling_avg（需 window 参数）[v0.12.0]
+
+**支持的过滤操作符**:
+- **比较**: =, !=, >, <, >=, <=
+- **字符串匹配**: contains, starts_with, ends_with, regex [v0.12.0]
+- **集合**: in, not_in [v0.12.0]
+- **空值检查**: is_null, is_not_null [v0.12.0]
 
 **修改**:
 - 新增过滤操作符: 编辑 `_apply_filters()` 方法
@@ -149,6 +159,7 @@ result = await handle_session_start(
 
 **v0.6.0 新增**: `usecols` 参数支持列选择
 **v0.11.0 新增**: 6 种新聚合函数（median, std, var, first, last, nunique）
+**v0.12.0 新增**: 7 种新过滤操作符（in, not_in, is_null, is_not_null, starts_with, ends_with, regex）；8 种新聚合函数（percentile25/75/90, mode, cumsum/cummax/cummin, rolling_avg）；`window` 参数支持
 
 ---
 
