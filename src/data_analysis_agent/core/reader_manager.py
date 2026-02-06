@@ -229,3 +229,90 @@ def get_reader_stats() -> Dict:
 def clear_reader(file_path: Optional[str] = None):
     """清理缓存的 reader（快捷函数）"""
     _reader_manager.clear(file_path)
+
+
+def preload_files(file_paths: list[str], mode: str = "metadata") -> Dict:
+    """
+    预加载多个文件到缓存
+
+    Args:
+        file_paths: 文件路径列表
+        mode: 预加载模式
+            - metadata: 仅加载元数据（sheet 名称、列信息），快速
+            - full: 完整加载数据
+
+    Returns:
+        预加载结果字典
+    """
+    import time
+    result = {
+        "success": True,
+        "mode": mode,
+        "files": [],
+        "total_files": len(file_paths),
+        "total_time_ms": 0
+    }
+
+    start_time = time.time()
+
+    for file_path in file_paths:
+        file_start = time.time()
+        try:
+            # 获取或创建 reader
+            reader = _reader_manager.get_reader(file_path)
+
+            if mode == "metadata":
+                # 仅加载元数据，不缓存数据（避免后续获取数据时只有 1 行）
+                sheet_names = reader._get_sheet_names()
+                # 使用 read_head 方法读取前几行获取列信息（不经过缓存）
+                head_result = reader.read_head(n=5)
+                columns = head_result["data"][0] if head_result["data"] else []
+                # 清除可能被缓存的数据（确保后续能读取完整数据）
+                # 注意：read_head 不经过缓存，但为保险起见清除缓存
+                reader.clear_cache()
+
+                file_result = {
+                    "file_path": file_path,
+                    "status": "loaded",
+                    "mode": "metadata",
+                    "sheets": sheet_names,
+                    "columns": len(columns),
+                    "sample_rows": len(head_result["data"]) - 1 if head_result["data"] else 0,
+                    "time_ms": round((time.time() - file_start) * 1000, 1)
+                }
+            else:  # mode == "full"
+                # 完整加载数据
+                df = reader._read_file()
+                file_result = {
+                    "file_path": file_path,
+                    "status": "loaded",
+                    "mode": "full",
+                    "rows": int(len(df)),
+                    "columns": int(len(df.columns)),
+                    "size_mb": round(df.memory_usage(deep=True).sum() / 1024 / 1024, 2),
+                    "time_ms": round((time.time() - file_start) * 1000, 1)
+                }
+
+            result["files"].append(file_result)
+            logger.info(f"[ReaderManager] 预加载成功: {file_path} ({file_result['time_ms']}ms)")
+
+        except FileNotFoundError:
+            result["files"].append({
+                "file_path": file_path,
+                "status": "error",
+                "error": "文件不存在"
+            })
+            logger.warning(f"[ReaderManager] 预加载失败: {file_path} - 文件不存在")
+        except Exception as e:
+            result["files"].append({
+                "file_path": file_path,
+                "status": "error",
+                "error": str(e)
+            })
+            logger.error(f"[ReaderManager] 预加载失败: {file_path} - {e}")
+
+    result["total_time_ms"] = round((time.time() - start_time) * 1000, 1)
+    result["loaded_count"] = sum(1 for f in result["files"] if f.get("status") == "loaded")
+    result["error_count"] = sum(1 for f in result["files"] if f.get("status") == "error")
+
+    return result

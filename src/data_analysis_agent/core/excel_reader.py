@@ -521,7 +521,8 @@ class ExcelReader:
     def _read_file(
         self,
         sheet_name: Optional[str] = None,
-        usecols: Optional[Union[str, List[int], List[str]]] = None
+        usecols: Optional[Union[str, List[int], List[str]]] = None,
+        nrows: Optional[int] = None
     ) -> pd.DataFrame:
         """读取文件（支持缓存和 LRU 清理）"""
         # 解析 usecols 参数（支持逗号分隔的字符串）
@@ -584,7 +585,8 @@ class ExcelReader:
                 self.file_path,
                 sheet_name=sheet_name or 0,
                 engine='openpyxl',
-                usecols=parsed_usecols
+                usecols=parsed_usecols,
+                nrows=nrows
             )
             # 如果返回的是字典（多sheet情况），取第一个
             if isinstance(result, dict):

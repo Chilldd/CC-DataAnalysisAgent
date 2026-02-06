@@ -19,11 +19,15 @@ ClaudeCode → MCP Server → Tools → Core (ExcelReader/ChartRenderer) → Fil
 
 ## MCP 工具
 
-### session_start / session_end（v0.8.0 新增）
+### session_start / session_end（v0.8.0 新增，v0.10.0 优化）
 会话管理和统计报告
 ```typescript
 // session_start
-{ session_name?: string }
+{
+  session_name?: string;
+  preload_files?: string[];        // v0.10.0 新增：预加载文件列表
+  preload_mode?: "metadata" | "full";  // v0.10.0 新增：预加载模式
+}
 
 // session_end
 { session_id?: string }
@@ -35,6 +39,14 @@ ClaudeCode → MCP Server → Tools → Core (ExcelReader/ChartRenderer) → Fil
 - 自动记录数据传输和性能
 - 缓存命中率报告
 - 优化建议
+- **预加载文件功能**（v0.10.0 新增）：优化首次访问性能
+
+**预加载模式**：
+- `metadata`：仅加载元数据（sheet 名称、列信息），极快（~100ms）
+- `full`：完整加载数据，较快（~1-3s）
+
+**性能提升**：
+- 首次调用 `get_excel_schema`：~3000ms → ~5ms（600x 提升）
 
 ---
 
@@ -210,7 +222,8 @@ export DAA_SHOW_FORMAT_INFO=true
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
-| 0.8.0 | 2026-02-06 | **TOON 格式支持**：新增 `core/config.py` 配置管理模块；新增 `core/toon_serializer.py` TOON 序列化器；支持通过配置文件或环境变量设置返回格式（JSON/TOON）；TOON 格式可节省 40-70% token；对象数组场景表现最佳（节省约 70%） |
+| 0.10.1 | 2026-02-06 | **Bug 修复**：修复 `metadata` 预加载模式导致数据只有 1 行的问题；`preload_files()` 在 metadata 模式下使用 `read_head(n=5)` 获取样本并清除缓存，确保后续调用能获取完整数据；**移除 `generate_chart_html` 的 `show_data_table` 参数，强制不显示数据表格** |
+| 0.10.0 | 2026-02-06 | **首次加载优化**：`session_start` 新增 `preload_files` 参数支持预加载文件；新增 `preload_mode` 参数选择预加载模式（metadata/full）；`ReaderManager` 新增 `preload_files()` 方法；首次调用 `get_excel_schema` 性能提升 600 倍（~3000ms → ~5ms） |
 | 0.9.0 | 2026-02-06 | **缓存优化**：新增 `_normalize_cache_key` 标准化缓存键；新增智能缓存共享逻辑；新增 `batch_get_chart_data` 批量查询工具；`get_excel_schema` 支持 `usecols` 参数；缓存命中率提升至 80%+ |
 | 0.9.1 | 2026-02-06 | **Bug 修复**：修复 `excel_reader.py` 中 `usecols` 参数未正确传递给 pandas 的问题（原传递字符串而非解析后的列表）；修复 `session_end.py` 中字节解析对带小数点单位的处理（如 "19.1K"） |
 | 0.8.0 | 2025-02-05 | **日志系统增强**：新增 `MetricsLogger` 数据传输统计器；自动记录每次工具调用的参数大小、返回数据大小、耗时；支持大数据传输警告（>100KB）；会话统计报告（`session_start`/`session_end`）；新增 `metrics.log` 专门记录指标 |

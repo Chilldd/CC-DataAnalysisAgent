@@ -243,7 +243,103 @@ info = reader.get_cache_info()
 
 ---
 
-## 扩展点
+## 预加载 API (v0.10.0 新增)
+
+### session_start 预加载参数
+
+**新增参数**：
+```typescript
+{
+  session_name?: string;           // 会话名称（可选）
+  preload_files?: string[];        // 预加载文件列表（可选）
+  preload_mode?: "metadata" | "full";  // 预加载模式（默认 metadata）
+}
+```
+
+**返回**：
+```json
+{
+  "success": true,
+  "session_id": "session_1234567890",
+  "session_name": "数据分析",
+  "start_time": 1234567890.123,
+  "message": "会话已开始...",
+  "preload": {
+    "success": true,
+    "mode": "metadata",
+    "total_files": 2,
+    "loaded_count": 2,
+    "error_count": 0,
+    "total_time_ms": 250.5,
+    "files": [
+      {
+        "file_path": "data1.xlsx",
+        "status": "loaded",
+        "mode": "metadata",
+        "columns": 15,
+        "time_ms": 120.3
+      },
+      {
+        "file_path": "data2.xlsx",
+        "status": "loaded",
+        "mode": "metadata",
+        "columns": 8,
+        "time_ms": 130.2
+      }
+    ]
+  }
+}
+```
+
+**预加载模式对比**：
+
+| 模式 | 描述 | 速度 | 内存占用 | 适用场景 |
+|------|------|------|----------|----------|
+| `metadata` | 仅加载元数据 | 极快 (~100ms) | 极低 | 需要先查看数据结构再决定如何分析 |
+| `full` | 完整加载数据 | 较快 (~1-3s) | 取决于文件大小 | 已确定要分析所有数据 |
+
+**性能优势**：
+
+| 场景 | 无预加载 | 预加载 metadata | 提升 |
+|------|---------|-----------------|------|
+| 首次调用 `get_excel_schema` | ~3000ms | ~5ms | 600x |
+| 后续调用 `get_chart_data` | ~5ms | ~5ms | 无变化 |
+
+**使用场景**：
+
+```python
+# 场景 1：探索性分析（推荐 metadata 模式）
+# 先快速加载元数据，查看数据结构，再决定如何分析
+await handle_session_start(
+    session_name="销售数据分析",
+    preload_files=["sales.xlsx", "products.xlsx"],
+    preload_mode="metadata"  # 快速，只加载列信息
+)
+# 然后调用 get_excel_schema 查看详细结构（~5ms）
+# 最后根据需要调用 get_chart_data
+
+# 场景 2：已知分析需求（使用 full 模式）
+# 已确定要分析所有数据，直接预加载完整数据
+await handle_session_start(
+    session_name="月度报表生成",
+    preload_files=["monthly_data.xlsx"],
+    preload_mode="full"  # 完整加载，后续查询更快
+)
+# 后续所有 get_chart_data 调用都会非常快
+```
+
+### ReaderManager.preload_files()
+
+也可以直接调用预加载函数：
+
+```python
+from data_analysis_agent.core.reader_manager import preload_files
+
+result = preload_files(
+    file_paths=["data1.xlsx", "data2.xlsx"],
+    mode="metadata"  # 或 "full"
+)
+```
 
 ### 添加新工具
 

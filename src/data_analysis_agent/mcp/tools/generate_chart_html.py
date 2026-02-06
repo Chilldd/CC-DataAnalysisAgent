@@ -19,7 +19,6 @@ session_start → get_excel_schema → get_chart_data → 本工具 → session_
 - advice: 分析建议（Claude 生成）
 - title: 图表标题
 - output_path: 输出 HTML 路径
-- show_data_table: 是否显示数据表格（默认 False）
 
 返回：
 - html_path: 生成的 HTML 文件路径
@@ -27,8 +26,7 @@ session_start → get_excel_schema → get_chart_data → 本工具 → session_
 
 生成的 HTML 包含：
 - 可交互的 ECharts 图表（支持多图表）
-- 分析建议卡片
-- 数据表格（可选，默认不显示）""",
+- 分析建议卡片""",
     inputSchema={
         "type": "object",
         "properties": {
@@ -60,10 +58,6 @@ session_start → get_excel_schema → get_chart_data → 本工具 → session_
             "sheet_name": {
                 "type": "string",
                 "description": "工作表名称（可选）"
-            },
-            "show_data_table": {
-                "type": "boolean",
-                "description": "是否显示数据表格（默认 False）"
             },
             "data_query": {
                 "type": "object",
@@ -114,7 +108,6 @@ async def handle_generate_chart_html(
     title: str = None,
     output_path: str = None,
     sheet_name: str = None,
-    show_data_table: bool = False,
     data_query: dict = None
 ) -> list[TextContent]:
     """
@@ -128,13 +121,11 @@ async def handle_generate_chart_html(
         title: 图表标题
         output_path: 输出路径
         sheet_name: 工作表名称
-        show_data_table: 是否显示数据表格
-        data_query: 数据查询配置
+        data_query: 数据查询配置（已废弃，保留参数兼容性但不使用）
 
     Returns:
         包含生成结果的 TextContent 列表
     """
-    from ...core.reader_manager import get_reader
     from ...core.chart_renderer import ChartRenderer
 
     try:
@@ -151,47 +142,24 @@ async def handle_generate_chart_html(
                 }, ensure_ascii=False, indent=2)
             )]
 
-        # 1. 获取数据（仅当需要显示数据表格时）
-        chart_data = None
-        if show_data_table:
-            reader = get_reader(file_path)
-
-            if data_query:
-                # 按查询条件获取数据
-                data = reader.query(
-                    filters=data_query.get("filters"),
-                    group_by=data_query.get("group_by"),
-                    aggregation=data_query.get("aggregation"),
-                    aggregate_column=data_query.get("aggregate_column"),
-                    limit=data_query.get("limit", 1000),
-                    sheet_name=sheet_name
-                )
-                chart_data = data["data"]
-            else:
-                # 读取完整数据
-                result = reader.read(sheet_name=sheet_name)
-                chart_data = result["data"]
-
-        # 2. 生成 HTML
+        # 生成 HTML（不包含数据表格）
         renderer = ChartRenderer()
         html_path = renderer.generate_html(
             echarts_configs=echarts_configs,
-            data=chart_data,
             advice=advice,
             title=title or "数据分析图表",
             output_path=output_path or _default_output_path(file_path),
-            show_data_table=show_data_table
+            show_data_table=False  # 强制不显示数据表格
         )
 
-        # 3. 返回结果
+        # 返回结果
         return [TextContent(
             type="text",
             text=json.dumps({
                 "success": True,
                 "html_path": html_path,
                 "message": f"图表已生成: {html_path}",
-                "chart_count": len(echarts_configs),
-                "data_table_included": show_data_table
+                "chart_count": len(echarts_configs)
             }, ensure_ascii=False, indent=2)
         )]
 

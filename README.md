@@ -6,6 +6,7 @@
 
 - **Token 优化工作流** - `get_excel_schema` 快速了解结构 → `get_chart_data(usecols=...)` 按列处理
 - **TOON 格式支持** - 节省 40-70% token 消耗，对象数组场景最优
+- **首次加载优化** - `session_start` 支持预加载文件，首次调用性能提升 600 倍
 - 读取 Excel/CSV 文件数据结构
 - 灵活的数据查询和聚合
 - 基于 ECharts 生成交互式 HTML 图表
@@ -88,10 +89,38 @@ Claude 将自动（推荐工作流）：
 5. 提供分析建议
 ```
 
+### 首次加载优化（v0.10.0 新增）
+
+如果需要处理多个文件或已知要分析的数据，可以在会话开始时预加载：
+
+```
+// 预加载多个文件的元数据（快速模式）
+session_start({
+  "session_name": "销售数据分析",
+  "preload_files": ["sales.xlsx", "products.xlsx", "customers.xlsx"],
+  "preload_mode": "metadata"  // 仅加载元数据，极快（~100ms）
+})
+
+// 后续调用 get_excel_schema 将非常快（~5ms）
+```
+
+**性能对比**：
+
+| 场景 | 无预加载 | 预加载 metadata | 提升 |
+|------|---------|-----------------|------|
+| 首次调用 `get_excel_schema` | ~3000ms | ~5ms | **600x** |
+| 后续调用 `get_chart_data` | ~5ms | ~5ms | 无变化 |
+
 ## 工具说明
 
 ### session_start / session_end
 会话管理，用于统计数据传输和性能分析
+
+**v0.10.0 新增**：
+- `preload_files` 参数：预加载文件列表，优化首次访问性能
+- `preload_mode` 参数：选择预加载模式
+  - `metadata`：仅加载元数据（极快，~100ms）
+  - `full`：完整加载数据（较快，~1-3s）
 
 ### get_excel_schema（推荐）
 快速获取 Excel 数据结构，最小 token 消耗

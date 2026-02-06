@@ -2,19 +2,50 @@
 
 ## MCP 工具
 
-### session_start / session_end（v0.8.0 新增）
+### session_start / session_end（v0.8.0 新增，v0.10.0 优化）
 会话管理和统计报告
 
 | 项 | 位置 |
 |---|---|
 | 工具定义 | `mcp/tools/session_start.py` / `session_end.py` |
 | 核心类 | `MetricsLogger` |
+| 预加载功能 | `ReaderManager.preload_files()` (v0.10.0) |
 
 **特点**：
 - 会话生命周期管理
 - 数据传输统计（自动记录）
 - 性能分析和优化建议
 - 缓存命中率报告
+- **预加载文件功能**（v0.10.0 新增）
+
+**v0.10.0 新增 - 首次加载优化**：
+- `preload_files` 参数：在会话开始时预加载文件
+- `preload_mode` 参数：选择预加载模式
+  - `metadata`：仅加载元数据（sheet 名称、列信息、前5行样本），不缓存数据
+  - `full`：完整加载数据并缓存
+- 优化首次访问性能，避免第一次调用 `get_excel_schema` 时的延迟
+
+**v0.10.1 修复**：
+- 修复 metadata 模式预加载后数据只有 1 行的问题
+- metadata 模式现在使用 `read_head(n=5)` 获取样本，不会缓存数据
+- 确保后续调用 `get_excel_schema` 能获取完整数据
+
+**使用示例**：
+```python
+# 预加载多个文件的元数据（快速模式）
+result = await handle_session_start(
+    session_name="数据分析",
+    preload_files=["data1.xlsx", "data2.xlsx"],
+    preload_mode="metadata"
+)
+
+# 预加载完整数据
+result = await handle_session_start(
+    session_name="数据分析",
+    preload_files=["data.xlsx"],
+    preload_mode="full"
+)
+```
 
 ---
 
@@ -68,10 +99,12 @@
 - ECharts 版本: 修改 CDN 链接
 - 默认主题: 修改模板中的配色
 
-**v0.5.0 更新**:
-- `show_data_table` 参数控制是否显示数据表格（默认 False）
-- `echarts_configs` 参数支持多图表数组
-- 数据仅在 `show_data_table=True` 时读取，减少 AI 传输数据量
+**v0.10.1 更新**:
+- **移除 `show_data_table` 参数**，强制不显示数据表格
+- 移除数据读取逻辑，减少不必要的数据传输
+
+**历史版本**:
+- v0.5.0: `echarts_configs` 参数支持多图表数组
 
 ---
 

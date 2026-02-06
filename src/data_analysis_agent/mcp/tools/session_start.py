@@ -20,6 +20,7 @@ session_start → get_excel_schema → 分析工具 → session_end
 - 初始化会话统计和缓存
 - 记录会话开始时间
 - 重置追踪计数器
+- 支持预加载文件（可选，优化首次访问速度）
 
 返回：会话 ID 和开始时间""",
     inputSchema={
@@ -28,6 +29,16 @@ session_start → get_excel_schema → 分析工具 → session_end
             "session_name": {
                 "type": "string",
                 "description": "会话名称（可选，便于识别）"
+            },
+            "preload_files": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "预加载文件列表（可选，优化首次访问速度）"
+            },
+            "preload_mode": {
+                "type": "string",
+                "enum": ["metadata", "full"],
+                "description": "预加载模式：metadata=仅元数据（快速），full=完整数据（默认metadata）"
             }
         }
     }
@@ -37,12 +48,18 @@ session_start → get_excel_schema → 分析工具 → session_end
 _session_start_time = None
 
 
-async def handle_session_start(session_name: str = None) -> list[TextContent]:
+async def handle_session_start(
+    session_name: str = None,
+    preload_files: list[str] = None,
+    preload_mode: str = "metadata"
+) -> list[TextContent]:
     """
     开始数据分析会话
 
     Args:
         session_name: 会话名称（可选）
+        preload_files: 预加载文件列表（可选）
+        preload_mode: 预加载模式（metadata/full）
 
     Returns:
         会话信息
@@ -52,6 +69,7 @@ async def handle_session_start(session_name: str = None) -> list[TextContent]:
     _session_start_time = time.time()
 
     from ...core.logging_config import get_logger, reset_metrics
+    from ...core.reader_manager import preload_files as reader_preload
     logger = get_logger(__name__)
 
     # 重置指标
@@ -62,15 +80,29 @@ async def handle_session_start(session_name: str = None) -> list[TextContent]:
 
     logger.info(f"[SESSION] 开始新会话: {name} (ID: {session_id})")
 
+    # 处理预加载
+    preload_result = None
+    if preload_files:
+        logger.info(f"[SESSION] 预加载 {len(preload_files)} 个文件 (模式: {preload_mode})")
+        preload_start = time.time()
+        preload_result = reader_preload(preload_files, mode=preload_mode)
+        preload_time = time.time() - preload_start
+        logger.info(f"[SESSION] 预加载完成，耗时: {preload_time*1000:.0f}ms")
+
+    response = {
+        "success": True,
+        "session_id": session_id,
+        "session_name": name,
+        "start_time": _session_start_time,
+        "message": "会话已开始，请继续使用其他工具进行分析。完成后调用 session_end 查看完整报告。"
+    }
+
+    if preload_result:
+        response["preload"] = preload_result
+
     return [TextContent(
         type="text",
-        text=json.dumps({
-            "success": True,
-            "session_id": session_id,
-            "session_name": name,
-            "start_time": _session_start_time,
-            "message": "会话已开始，请继续使用其他工具进行分析。完成后调用 session_end 查看完整报告。"
-        }, ensure_ascii=False, indent=2)
+        text=json.dumps(response, ensure_ascii=False, indent=2)
     )]
 
 
