@@ -1,6 +1,27 @@
 # DataAnalysisAgent API 参考
 
-## 日志系统 (v0.8.0 新增)
+本文档提供详细的 API 参考和代码扩展示例。
+
+> **相关文档**:
+> - `DESIGN.md` - 架构设计和 MCP 工具接口
+> - `FEATURES.md` - 功能清单和代码位置
+
+---
+
+## 目录
+
+- [日志系统 API](#日志系统-api)
+- [批量查询 API](#批量查询-api)
+- [缓存优化 API](#缓存优化-api)
+- [预加载 API](#预加载-api)
+- [扩展开发](#扩展开发)
+- [数据格式](#数据格式)
+
+---
+
+## 日志系统 API
+
+**版本**: v0.8.0 新增
 
 ### 基本使用
 
@@ -19,7 +40,6 @@ logger.error("错误信息")
 ```python
 from data_analysis_agent.core import setup_logging
 
-# 配置日志系统
 setup_logging(
     log_level="DEBUG",           # 日志级别
     log_dir="./logs",            # 日志目录
@@ -27,22 +47,18 @@ setup_logging(
     log_to_console=True,         # 是否输出到控制台
     max_file_size=10*1024*1024,  # 单个文件最大 10MB
     backup_count=5,              # 保留 5 个备份
-    use_time_rotation=True,      # 按天滚动（False 则按大小滚动）
+    use_time_rotation=True,      # 按天滚动
     enable_metrics=True          # 启用数据传输统计
 )
 ```
 
 ### 数据传输指标统计
 
-日志系统自动记录所有工具调用的数据传输量，用于分析和优化：
-
 ```python
 from data_analysis_agent.core import get_metrics, log_metrics_summary, reset_metrics
 
-# 获取指标记录器
-metrics = get_metrics()
-
 # 获取统计摘要
+metrics = get_metrics()
 summary = metrics.get_summary()
 print(summary)
 # 输出示例:
@@ -50,23 +66,8 @@ print(summary)
 #     '总调用次数': 15,
 #     '总发送数据': '2.5KB',
 #     '总返回数据': '1.2MB',
-#     '工具统计': {
-#         'get_chart_data': {
-#             '调用次数': 8,
-#             '平均返回大小': '150.0KB',
-#             '总返回大小': '1.2MB',
-#             '平均耗时': '125ms',
-#             '错误数': 0
-#         },
-#         ...
-#     },
-#     '文件统计': {
-#         'data.xlsx': {
-#             '读取次数': 10,
-#             '总数据量': '500.0KB',
-#             '缓存命中率': '80.0%'
-#         }
-#     }
+#     '工具统计': {...},
+#     '文件统计': {...}
 # }
 
 # 直接输出统计摘要到日志
@@ -76,68 +77,20 @@ log_metrics_summary()
 reset_metrics()
 ```
 
-### 在扩展模块中使用
-
-```python
-from data_analysis_agent.core import get_logger, get_metrics
-
-logger = get_logger(__name__)
-metrics = get_metrics()
-
-class MyCustomReader:
-    def __init__(self, file_path):
-        logger.info(f"初始化 MyCustomReader: {file_path}")
-
-    def read_data(self):
-        logger.debug("开始读取数据")
-        start_time = time.time()
-        try:
-            # 数据读取逻辑
-            data = self._do_read()
-
-            # 记录操作指标
-            duration_ms = (time.time() - start_time) * 1000
-            result_size = len(json.dumps(data))
-
-            logger.info(f"数据读取完成: {self._format_bytes(result_size)}, 耗时: {duration_ms:.0f}ms")
-
-            return data
-        except Exception as e:
-            logger.error(f"读取失败: {e}", exc_info=True)
-            raise
-```
-
 ### 日志文件
 
 配置 `log_to_file=True` 后，将生成以下日志文件：
 - `logs/data_analysis_agent.log` - 主日志文件
 - `logs/error.log` - 仅包含 ERROR 及以上级别的日志
-- `logs/metrics.log` - 指标统计日志（数据传输量、耗时等）
-- 滚动备份文件（如 `data_analysis_agent.log.2025-02-04`）
-
-### 日志输出示例
-
-```
-[REQUEST] 工具: get_chart_data | 参数: {"file_path":"data.xlsx","group_by":"地区","aggregation":"sum"}
-[RESPONSE] 工具: get_chart_data | 返回大小: 15.2KB | 耗时: 120ms
-[METRICS] 工具调用: get_chart_data | 参数: {...} | 返回大小: 15.2KB | 耗时: 120ms | 成功: True
-[METRICS] ===== 数据传输统计摘要 =====
-[METRICS] 总调用次数: 5
-[METRICS] 总发送数据: 1.2KB
-[METRICS] 总返回数据: 850.5KB
-[METRICS] --- 工具详情 ---
-[METRICS]   get_chart_data: 调用3次, 平均返回170.1KB, 平均耗时115ms
-[METRICS]   get_excel_schema: 调用2次, 平均返回2.5KB, 平均耗时45ms
-[METRICS] =============================
-```
+- `logs/metrics.log` - 指标统计日志
 
 ---
 
-## 批量查询 API (v0.9.0 新增)
+## 批量查询 API
+
+**版本**: v0.9.0 新增
 
 ### batch_get_chart_data
-
-批量处理多个图表数据查询，显著提升性能。
 
 **参数**:
 ```typescript
@@ -201,7 +154,9 @@ result = await handle_batch_get_chart_data(
 
 ---
 
-## 缓存优化 API (v0.9.0 新增)
+## 缓存优化 API
+
+**版本**: v0.9.0 新增
 
 ### 标准化缓存键
 
@@ -223,12 +178,10 @@ reader._read_file(usecols=['B', 'A'])
 df_all = reader.read()  # 缓存全量数据
 
 # 第二次读取列子集（自动从缓存提取）
-df_subset = reader.read(usecols=['A', 'B'])  # 从全量缓存提取，无需重新读取文件
+df_subset = reader.read(usecols=['A', 'B'])  # 从全量缓存提取
 ```
 
 ### 缓存统计
-
-获取缓存性能指标：
 
 ```python
 info = reader.get_cache_info()
@@ -243,7 +196,9 @@ info = reader.get_cache_info()
 
 ---
 
-## 预加载 API (v0.10.0 新增)
+## 预加载 API
+
+**版本**: v0.10.0 新增
 
 ### session_start 预加载参数
 
@@ -271,22 +226,7 @@ info = reader.get_cache_info()
     "loaded_count": 2,
     "error_count": 0,
     "total_time_ms": 250.5,
-    "files": [
-      {
-        "file_path": "data1.xlsx",
-        "status": "loaded",
-        "mode": "metadata",
-        "columns": 15,
-        "time_ms": 120.3
-      },
-      {
-        "file_path": "data2.xlsx",
-        "status": "loaded",
-        "mode": "metadata",
-        "columns": 8,
-        "time_ms": 130.2
-      }
-    ]
+    "files": [...]
   }
 }
 ```
@@ -298,34 +238,22 @@ info = reader.get_cache_info()
 | `metadata` | 仅加载元数据 | 极快 (~100ms) | 极低 | 需要先查看数据结构再决定如何分析 |
 | `full` | 完整加载数据 | 较快 (~1-3s) | 取决于文件大小 | 已确定要分析所有数据 |
 
-**性能优势**：
-
-| 场景 | 无预加载 | 预加载 metadata | 提升 |
-|------|---------|-----------------|------|
-| 首次调用 `get_excel_schema` | ~3000ms | ~5ms | 600x |
-| 后续调用 `get_chart_data` | ~5ms | ~5ms | 无变化 |
-
 **使用场景**：
 
 ```python
 # 场景 1：探索性分析（推荐 metadata 模式）
-# 先快速加载元数据，查看数据结构，再决定如何分析
 await handle_session_start(
     session_name="销售数据分析",
     preload_files=["sales.xlsx", "products.xlsx"],
     preload_mode="metadata"  # 快速，只加载列信息
 )
-# 然后调用 get_excel_schema 查看详细结构（~5ms）
-# 最后根据需要调用 get_chart_data
 
 # 场景 2：已知分析需求（使用 full 模式）
-# 已确定要分析所有数据，直接预加载完整数据
 await handle_session_start(
     session_name="月度报表生成",
     preload_files=["monthly_data.xlsx"],
     preload_mode="full"  # 完整加载，后续查询更快
 )
-# 后续所有 get_chart_data 调用都会非常快
 ```
 
 ### ReaderManager.preload_files()
@@ -341,24 +269,13 @@ result = preload_files(
 )
 ```
 
+---
+
+## 扩展开发
+
 ### 添加新工具
 
-**文件**: `mcp/server.py`
-
-```python
-from .tools.new_tool import tool_definition as new_tool, handle_new_tool
-
-@server.list_tools()
-async def list_tools() -> list[Tool]:
-    return [info_tool, chart_tool, data_tool, new_tool]
-
-@server.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-    if name == "new_tool":
-        return await handle_new_tool(**arguments)
-```
-
-**文件**: `mcp/tools/new_tool.py`
+**步骤 1**: 创建工具文件 `mcp/tools/new_tool.py`
 
 ```python
 from mcp.types import Tool, TextContent
@@ -367,44 +284,68 @@ import json
 tool_definition = Tool(
     name="new_tool",
     description="工具描述",
-    inputSchema={"type": "object", "properties": {...}, "required": [...]}
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "param1": {"type": "string", "description": "参数描述"}
+        },
+        "required": ["param1"]
+    }
 )
 
-async def handle_new_tool(...) -> list[TextContent]:
-    return [TextContent(type="text", text=json.dumps({"success": True, "data": ...}))]
+async def handle_new_tool(param1: str) -> list[TextContent]:
+    # 实现工具逻辑
+    result = {"success": True, "data": f"处理: {param1}"}
+    return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
+```
+
+**步骤 2**: 在 `mcp/server.py` 中注册工具
+
+```python
+from .tools.new_tool import tool_definition as new_tool, handle_new_tool
+
+@server.list_tools()
+async def list_tools() -> list[Tool]:
+    return [..., new_tool]
+
+@server.call_tool()
+async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+    if name == "new_tool":
+        return await handle_new_tool(**arguments)
+    # ... 其他工具
 ```
 
 ### ExcelReader 扩展
 
 **文件**: `core/excel_reader.py`
 
-| 扩展 | 方法 | 行号 |
+| 扩展 | 方法 | 说明 |
 |------|------|------|
-| 新文件格式 | `_read_file` | 316 |
-| 新聚合函数 | `_group_and_aggregate` | 437 |
-| 新过滤操作符 | `_apply_filters` | 411 |
-| 大文件分块读取 | `read_chunked` | 143 |
-| 多线程并行读取 | `read_parallel_chunks` | 200 |
-| 列选择优化 | `get_info`, `_read_file`, `read`, `query` | 29, 316, 68, 91 |
-| LRU 缓存机制 | `_read_file`, `__init__` | 13, 316 |
-| 缓存统计 | `get_cache_info` | 435 |
-| 清空缓存 | `clear_cache` | 420 |
-| 快速行数统计 | `get_row_count` | 184 |
-| 首尾读取 | `read_head`, `read_tail` | 230, 268 |
+| 新文件格式 | `_read_file` | 添加新的文件格式支持 |
+| 新聚合函数 | `_group_and_aggregate` | 添加新的聚合函数 |
+| 新过滤操作符 | `_apply_filters` | 添加新的过滤操作符 |
 
 **添加文件格式**:
 ```python
+# 在 _read_file 方法中添加
 elif suffix == '.parquet':
     return pd.read_parquet(self.file_path)
 ```
 
 **添加聚合函数**:
 ```python
-agg_funcs = {"sum": "sum", "avg": "mean", "new_func": "pandas_func"}
+# 在 _group_and_aggregate 方法的 agg_funcs 中添加
+agg_funcs = {
+    "sum": "sum",
+    "avg": "mean",
+    "median": "median",  # 新增
+    "std": "std"         # 新增
+}
 ```
 
 **添加过滤操作符**:
 ```python
+# 在 _apply_filters 方法中添加
 elif op == "in":
     df = df[df[col].isin(val)]
 ```
@@ -415,22 +356,65 @@ elif op == "in":
 
 **文件**: `core/chart_renderer.py`
 
-修改 `_render_template` 方法的 HTML/CSS/JavaScript。
+修改 `_render_template` 方法的 HTML/CSS/JavaScript 来自定义图表样式。
+
+---
 
 ## 数据格式
 
-**工具返回**:
+### 工具返回格式
+
+**成功响应**:
 ```json
-{"success": true, "data": ...} 或 {"success": false, "error": "..."}
+{"success": true, "data": ...}
 ```
 
-**表格数据**:
+**错误响应**:
+```json
+{"success": false, "error": "..."}
+```
+
+### 表格数据格式
+
 ```json
 [["列1", "列2"], ["值1", "值2"]]
 ```
 
-## 版本更新
+### TOON 格式 (v0.8.0 新增)
+
+TOON (Token-Oriented Object Notation) 是一种节省 token 的数据格式。
+
+**示例**:
+```python
+# JSON 格式
+{"users": [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]}
+
+# TOON 格式
+# users[2]{id,name}:
+#   1,Alice
+#   2,Bob
+```
+
+**API**:
+```python
+from data_analysis_agent.core import to_toon, serialize_result, get_response_format, set_response_format
+
+# 序列化为 TOON
+toon_str = to_toon(data)
+
+# 带格式标记的序列化
+result = serialize_result(data, format_type="toon", show_format=True)
+
+# 检查和设置格式
+current_format = get_response_format()
+set_response_format("toon")
+```
+
+---
+
+## 版本更新流程
 
 1. 更新 `pyproject.toml` 版本号
 2. 更新 `DESIGN.md` 版本历史
-3. Git tag: `git tag v0.x.0`
+3. 更新 `FEATURES.md` 功能描述
+4. Git tag: `git tag v0.x.0`

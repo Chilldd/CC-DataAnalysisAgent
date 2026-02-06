@@ -38,7 +38,8 @@ pip install -e .
   "mcpServers": {
     "data-analysis-agent": {
       "command": "python",
-      "args": ["-m", "data_analysis_agent"]
+      "args": ["-m", "data_analysis_agent"],
+      "cwd": "D:\\WorkSpace\\AI\\CC-DataAnalysisAgent"
     }
   }
 }
@@ -114,6 +115,7 @@ session_start({
 ## 工具说明
 
 ### session_start / session_end
+
 会话管理，用于统计数据传输和性能分析
 
 **v0.10.0 新增**：
@@ -123,6 +125,7 @@ session_start({
   - `full`：完整加载数据（较快，~1-3s）
 
 ### get_excel_schema（推荐）
+
 快速获取 Excel 数据结构，最小 token 消耗
 
 **返回**：列名、第一行数据、总行数、建议的维度/指标列
@@ -133,23 +136,24 @@ session_start({
 3. 调用 `get_chart_data(usecols=...)` 按列处理数据
 
 ### get_excel_info
+
 获取 Excel 文件的结构信息和样本数据（包含更多统计信息）
 
 ### generate_chart_html
+
 基于 ECharts 配置和 Excel 数据生成完整的 HTML 图表文件
 
-**v0.5.0 新增**：
-- 支持多图表（`echarts_configs` 数组）
-- 默认不显示数据表格（`show_data_table=False`），减少数据传输
-- 可通过 `show_data_table=True` 显示数据表格
+**v0.10.1 更新**：移除 `show_data_table` 参数，强制不显示数据表格
 
 ### get_chart_data
+
 从 Excel 文件中查询和聚合数据，用于图表渲染
 
 **v0.6.0 新增**：
 - `usecols` 参数支持列选择，减少 token 消耗
 
-### batch_get_chart_data（v0.9.0 新增，v0.9.1 修复）
+### batch_get_chart_data（v0.9.0 新增）
+
 批量获取图表数据，一次性处理多个查询
 
 **优势**：
@@ -159,8 +163,14 @@ session_start({
 
 **使用场景**：需要生成多个图表时
 
-**v0.9.1 修复**：
-- 修复 usecols 参数传递问题（pandas 不接受逗号分隔的字符串）
+## 文档
+
+| 文档 | 说明 |
+|------|------|
+| [DESIGN.md](docs/DESIGN.md) | 架构设计、MCP 工具接口、版本历史 |
+| [FEATURES.md](docs/FEATURES.md) | 功能清单与修改位置 |
+| [API.md](docs/API.md) | API 参考和扩展示例 |
+| [TASKS.md](docs/TASKS.md) | 待办任务清单 |
 
 ## 许可证
 
