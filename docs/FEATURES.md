@@ -343,6 +343,74 @@ bool     → boolean
 
 **新增依赖**: 在 `dependencies` 列表中添加
 
+### 代码质量配置
+
+**版本**: v0.13.0 新增
+
+文件: `pyproject.toml`, `.pre-commit-config.yaml`
+
+**工具**:
+- **Black**: 代码格式化（行长度 100）
+- **isort**: 导入排序
+- **flake8**: 代码检查
+- **mypy**: 类型检查
+- **pre-commit**: Git 提交前自动检查
+
+**安装**:
+```bash
+# 安装 pre-commit
+pip install pre-commit
+
+# 激活 hooks
+pre-commit install
+
+# 手动运行
+pre-commit run --all-files
+```
+
+**类型检查**:
+```bash
+# 运行 mypy
+mypy src/data_analysis_agent
+
+# 配置: pyproject.toml [tool.mypy]
+```
+
+### 异常处理
+
+**版本**: v0.13.0 新增
+
+文件: `core/exceptions.py`
+
+**自定义异常类**:
+- `DataAnalysisAgentError`: 基础异常类
+- `FileError`: 文件相关异常
+  - `FileNotFoundError`: 文件不存在
+  - `FileFormatError`: 文件格式不支持
+  - `FileEncodingError`: 文件编码错误
+- `DataError`: 数据处理异常
+  - `ColumnNotFoundError`: 列不存在
+  - `AggregationError`: 聚合操作异常
+  - `FilterError`: 过滤条件异常
+- `ConfigError`: 配置相关异常
+- `ValidationError`: 数据验证异常
+- `CacheError`: 缓存相关异常
+- `ChartError`: 图表生成异常
+
+**使用示例**:
+```python
+from .exceptions import FileNotFoundError, ColumnNotFoundError
+
+# 抛出异常
+raise FileNotFoundError(file_path="data.xlsx")
+
+# 捕获异常
+try:
+    reader._read_file()
+except FileNotFoundError as e:
+    logger.error(f"文件不存在: {e.file_path}")
+```
+
 ### ClaudeCode 配置
 
 文件: `%APPDATA%\Claude\claude_desktop_config.json`
@@ -363,10 +431,42 @@ bool     → boolean
 
 文件: `.data-analysis-agent.toml` 或 `~/.config/data-analysis-agent/config.toml`
 
+**版本**: v0.13.0 增强
+
 ```toml
 [server]
-response_format = "toon"
-show_format_info = true
+response_format = "toon"      # json 或 toon
+show_format_info = true       # 是否显示格式标记
+host = "localhost"            # v0.13.0: 服务器主机
+port = 8000                   # v0.13.0: 服务器端口
+
+[cache]
+enabled = true                # v0.13.0: 是否启用缓存
+max_size = 10                 # v0.13.0: 最大缓存条目数
+ttl = 3600                    # v0.13.0: 缓存过期时间（秒）
+
+[logging]
+level = "INFO"                # v0.13.0: 日志级别
+file = "logs/agent.log"       # v0.13.0: 日志文件路径
+console = true                # v0.13.0: 是否输出到控制台
+max_file_size_mb = 10         # v0.13.0: 单个日志文件最大大小
+backup_count = 5              # v0.13.0: 保留的备份文件数量
+
+[performance]
+enable_threading = false      # v0.13.0: 是否启用多线程读取
+chunk_size = 10000            # v0.13.0: 分块读取大小
+default_limit = 100           # v0.13.0: 默认查询限制
+max_limit = 10000             # v0.13.0: 最大查询限制
+```
+
+**环境变量** (优先级更高):
+```bash
+export DAA_RESPONSE_FORMAT=toon
+export DAA_SHOW_FORMAT_INFO=true
+export DAA_HOST=localhost
+export DAA_PORT=8000
+export DAA_CACHE_ENABLED=true
+export DAA_LOG_LEVEL=INFO
 ```
 
 ---

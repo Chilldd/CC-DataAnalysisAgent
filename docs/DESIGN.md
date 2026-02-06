@@ -340,6 +340,7 @@ export DAA_SHOW_FORMAT_INFO=true
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| **0.13.0** | 2026-02-06 | **代码质量提升**：类型注解完善（mypy 配置、核心模块类型注解）；异常处理优化（新增 `exceptions.py` 自定义异常类）；代码格式化配置（Black、isort、flake8、pre-commit hooks）；配置文件支持增强（新增 CacheConfig、LoggingConfig、PerformanceConfig） |
 | **0.12.0** | 2026-02-06 | **功能增强**：扩展过滤操作符，新增 in、not_in、is_null、is_not_null、starts_with、ends_with、regex；扩展聚合函数进阶，新增 percentile25/75/90（百分位数）、mode（众数）、cumsum/cummax/cummin（累计聚合）、rolling_avg（移动平均，需 window 参数） |
 | **0.11.0** | 2026-02-06 | **功能增强**：扩展聚合函数，新增 median（中位数）、std（标准差）、var（方差）、first（第一个值）、last（最后一个值）、nunique（唯一值计数）；count 和 nunique 支持不指定 aggregate_column |
 | **0.10.1** | 2026-02-06 | **Bug 修复**：修复 metadata 预加载模式导致数据只有 1 行的问题；`preload_files()` 在 metadata 模式下使用 `read_head(n=5)` 获取样本并清除缓存；移除 `generate_chart_html` 的 `show_data_table` 参数，强制不显示数据表格 |

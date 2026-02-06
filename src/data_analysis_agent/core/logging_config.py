@@ -6,7 +6,7 @@ import json
 import time
 from pathlib import Path
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, List, Tuple, Callable
 from collections import defaultdict
 from functools import wraps
 import threading
@@ -16,34 +16,55 @@ class ColoredFormatter(logging.Formatter):
     """带颜色的控制台日志格式化器"""
 
     # ANSI 颜色代码
-    COLORS = {
+    COLORS: Dict[str, str] = {
         'DEBUG': '\033[36m',      # 青色
         'INFO': '\033[32m',       # 绿色
         'WARNING': '\033[33m',    # 黄色
         'ERROR': '\033[31m',      # 红色
         'CRITICAL': '\033[35m',   # 紫色
     }
-    RESET = '\033[0m'
+    RESET: str = '\033[0m'
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
+        """格式化日志记录
+
+        Args:
+            record: 日志记录对象
+
+        Returns:
+            格式化后的字符串
+        """
         # 添加颜色到级别名称
         levelname = record.levelname
         if levelname in self.COLORS:
             record.levelname = f"{self.COLORS[levelname]}{levelname}{self.RESET}"
         return super().format(record)
 
-    def formatTime(self, record, datefmt=None):
-        """自定义时间格式"""
+    def formatTime(self, record: logging.LogRecord, datefmt: Optional[str] = None) -> str:
+        """自定义时间格式
+
+        Args:
+            record: 日志记录对象
+            datefmt: 日期格式（未使用）
+
+        Returns:
+            格式化的时间字符串
+        """
         return logging.Formatter.formatTime(self, record, '%Y-%m-%d %H:%M:%S')
 
 
 class MetricsLogger:
     """数据传输和性能指标统计器"""
 
-    _instance = None
-    _lock = threading.Lock()
+    _instance: Optional["MetricsLogger"] = None
+    _lock: threading.Lock = threading.Lock()
 
-    def __new__(cls):
+    def __new__(cls) -> "MetricsLogger":
+        """单例模式创建实例
+
+        Returns:
+            MetricsLogger 实例
+        """
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -51,12 +72,13 @@ class MetricsLogger:
                     cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """初始化统计器"""
         if self._initialized:
             return
         self._initialized = True
 
-        self._tool_stats: Dict[str, Dict] = defaultdict(lambda: {
+        self._tool_stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
             'call_count': 0,
             'total_bytes_sent': 0,
             'total_bytes_received': 0,
@@ -64,27 +86,39 @@ class MetricsLogger:
             'errors': 0,
             'last_call': None
         })
-        self._file_stats: Dict[str, Dict] = defaultdict(lambda: {
+        self._file_stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
             'read_count': 0,
             'total_bytes': 0,
             'cache_hits': 0,
             'cache_misses': 0
         })
-        self._logger = None
+        self._logger: Optional[logging.Logger] = None
 
-    def set_logger(self, logger: logging.Logger):
-        """设置日志记录器"""
+    def set_logger(self, logger: logging.Logger) -> None:
+        """设置日志记录器
+
+        Args:
+            logger: 日志记录器实例
+        """
         self._logger = logger
 
     def log_tool_call(
         self,
         tool_name: str,
-        args: dict,
+        args: Dict[str, Any],
         result_size: int,
         duration_ms: float,
         success: bool = True
-    ):
-        """记录工具调用统计"""
+    ) -> None:
+        """记录工具调用统计
+
+        Args:
+            tool_name: 工具名称
+            args: 工具调用参数
+            result_size: 返回结果大小（字节）
+            duration_ms: 执行耗时（毫秒）
+            success: 是否成功
+        """
         stats = self._tool_stats[tool_name]
         stats['call_count'] += 1
         stats['total_bytes_sent'] += self._estimate_size(args)
@@ -111,8 +145,14 @@ class MetricsLogger:
                     f"[METRICS] ⚠️ 大数据传输: {tool_name} 返回 {self._format_bytes(result_size)}"
                 )
 
-    def log_file_read(self, file_path: str, bytes_read: int, from_cache: bool = False):
-        """记录文件读取统计"""
+    def log_file_read(self, file_path: str, bytes_read: int, from_cache: bool = False) -> None:
+        """记录文件读取统计
+
+        Args:
+            file_path: 文件路径
+            bytes_read: 读取字节数
+            from_cache: 是否来自缓存
+        """
         stats = self._file_stats[file_path]
         stats['read_count'] += 1
         stats['total_bytes'] += bytes_read
@@ -129,13 +169,17 @@ class MetricsLogger:
                 f"大小: {self._format_bytes(bytes_read)}"
             )
 
-    def get_summary(self) -> dict:
-        """获取统计摘要"""
+    def get_summary(self) -> Dict[str, Any]:
+        """获取统计摘要
+
+        Returns:
+            包含统计信息的字典
+        """
         total_calls = sum(s['call_count'] for s in self._tool_stats.values())
         total_sent = sum(s['total_bytes_sent'] for s in self._tool_stats.values())
         total_received = sum(s['total_bytes_received'] for s in self._tool_stats.values())
 
-        tool_details = {}
+        tool_details: Dict[str, Dict[str, Any]] = {}
         for tool, stats in self._tool_stats.items():
             if stats['call_count'] > 0:
                 tool_details[tool] = {
@@ -148,7 +192,7 @@ class MetricsLogger:
                     '错误数': stats['errors']
                 }
 
-        file_details = {}
+        file_details: Dict[str, Dict[str, Any]] = {}
         for file, stats in self._file_stats.items():
             if stats['read_count'] > 0:
                 cache_rate = stats['cache_hits'] / stats['read_count'] * 100
@@ -166,7 +210,7 @@ class MetricsLogger:
             '文件统计': file_details
         }
 
-    def log_summary(self):
+    def log_summary(self) -> None:
         """输出统计摘要到日志"""
         summary = self.get_summary()
         if self._logger:
@@ -197,28 +241,50 @@ class MetricsLogger:
 
             self._logger.info(f"[METRICS] =============================")
 
-    def reset(self):
+    def reset(self) -> None:
         """重置统计数据"""
         self._tool_stats.clear()
         self._file_stats.clear()
 
     def _estimate_size(self, obj: Any) -> int:
-        """估算对象的字节大小"""
+        """估算对象的字节大小
+
+        Args:
+            obj: 要估算的对象
+
+        Returns:
+            估算的字节大小
+        """
         try:
             return len(json.dumps(obj, ensure_ascii=False))
         except Exception:
             return len(str(obj))
 
     def _format_bytes(self, bytes_size: int) -> str:
-        """格式化字节大小"""
+        """格式化字节大小
+
+        Args:
+            bytes_size: 字节大小
+
+        Returns:
+            格式化后的字符串
+        """
         for unit in ['B', 'KB', 'MB', 'GB']:
             if bytes_size < 1024.0:
                 return f"{bytes_size:.1f}{unit}"
             bytes_size /= 1024.0
         return f"{bytes_size:.1f}TB"
 
-    def _truncate_dict(self, d: dict, max_length: int = 200) -> str:
-        """截断字典的字符串表示"""
+    def _truncate_dict(self, d: Dict[str, Any], max_length: int = 200) -> str:
+        """截断字典的字符串表示
+
+        Args:
+            d: 要截断的字典
+            max_length: 最大长度
+
+        Returns:
+            截断后的字符串
+        """
         s = json.dumps(d, ensure_ascii=False)
         if len(s) > max_length:
             return s[:max_length] + "..."
@@ -226,17 +292,17 @@ class MetricsLogger:
 
 
 # 全局指标记录器实例
-metrics = MetricsLogger()
+metrics: MetricsLogger = MetricsLogger()
 
 
 class LoggerFactory:
     """日志工厂类 - 创建和管理 Logger 实例"""
 
-    _configured = False
+    _configured: bool = False
     _log_dir: Optional[Path] = None
-    _log_level = logging.INFO
-    _log_to_file = False
-    _log_to_console = True
+    _log_level: int = logging.INFO
+    _log_to_file: bool = False
+    _log_to_console: bool = True
 
     @classmethod
     def setup(
@@ -395,32 +461,47 @@ class LoggerFactory:
 
 # 便捷函数
 def get_logger(name: str) -> logging.Logger:
-    """获取 Logger 实例的便捷函数"""
+    """获取 Logger 实例的便捷函数
+
+    Args:
+        name: Logger 名称
+
+    Returns:
+        Logger 实例
+    """
     return LoggerFactory.get_logger(name)
 
 
-def setup_logging(**kwargs) -> None:
-    """配置日志系统的便捷函数"""
+def setup_logging(**kwargs: Any) -> None:
+    """配置日志系统的便捷函数
+
+    Args:
+        **kwargs: 传递给 LoggerFactory.setup 的参数
+    """
     LoggerFactory.setup(**kwargs)
 
 
 def get_metrics() -> MetricsLogger:
-    """获取指标记录器实例"""
+    """获取指标记录器实例
+
+    Returns:
+        MetricsLogger 实例
+    """
     return metrics
 
 
-def log_metrics_summary():
+def log_metrics_summary() -> None:
     """输出指标统计摘要"""
     metrics.log_summary()
 
 
-def reset_metrics():
+def reset_metrics() -> None:
     """重置指标统计"""
     metrics.reset()
 
 
 # 默认配置 - 初始化时使用
-def init_default_logging():
+def init_default_logging() -> None:
     """初始化默认日志配置（仅控制台输出，INFO 级别）"""
     LoggerFactory.setup(
         log_level="INFO",

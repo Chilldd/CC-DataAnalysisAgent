@@ -6,9 +6,8 @@
 
 import threading
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Any
 from collections import OrderedDict
-from datetime import datetime, timedelta
 import time
 
 from .excel_reader import ExcelReader
@@ -28,11 +27,15 @@ class ReaderManager:
     4. 线程安全
     """
 
-    _instance = None
-    _lock = threading.Lock()
+    _instance: Optional["ReaderManager"] = None
+    _lock: threading.Lock = threading.Lock()
 
-    def __new__(cls):
-        """单例模式"""
+    def __new__(cls) -> "ReaderManager":
+        """单例模式
+
+        Returns:
+            ReaderManager 实例
+        """
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -40,24 +43,24 @@ class ReaderManager:
                     cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         """初始化管理器"""
         if self._initialized:
             return
 
         # 使用 OrderedDict 实现 LRU 缓存
         # {file_path: (reader, last_used_time)}
-        self._readers: OrderedDict[str, tuple[ExcelReader, float]] = OrderedDict()
+        self._readers: "OrderedDict[str, tuple[ExcelReader, float]]" = OrderedDict()
 
         # 配置
-        self.max_readers = 5  # 最多缓存 5 个文件的 reader
-        self.idle_timeout = 300  # 5 分钟未使用则清理
+        self.max_readers: int = 5  # 最多缓存 5 个文件的 reader
+        self.idle_timeout: int = 300  # 5 分钟未使用则清理
 
         # 统计信息
-        self._hits = 0
-        self._misses = 0
+        self._hits: int = 0
+        self._misses: int = 0
 
-        self._initialized = True
+        self._initialized: bool = True
         logger.info(f"[ReaderManager] 初始化完成，max_readers={self.max_readers}, idle_timeout={self.idle_timeout}s")
 
     def get_reader(self, file_path: str) -> ExcelReader:
@@ -110,7 +113,15 @@ class ReaderManager:
             return reader
 
     def _is_file_modified(self, file_path: str, last_used: float) -> bool:
-        """检查文件在 last_used 时间之后是否被修改"""
+        """检查文件在 last_used 时间之后是否被修改
+
+        Args:
+            file_path: 文件路径
+            last_used: 上次使用时间戳
+
+        Returns:
+            文件是否被修改
+        """
         try:
             path = Path(file_path)
             if not path.exists():
@@ -121,12 +132,12 @@ class ReaderManager:
         except Exception:
             return False
 
-    def _cleanup_if_needed(self):
+    def _cleanup_if_needed(self) -> None:
         """清理不活跃的 reader"""
         current_time = time.time()
 
         # 清理超过 idle_timeout 的 reader
-        to_remove = []
+        to_remove: List[str] = []
         for path, (reader, last_used) in self._readers.items():
             if current_time - last_used > self.idle_timeout:
                 to_remove.append(path)
@@ -139,8 +150,12 @@ class ReaderManager:
             oldest_path = next(iter(self._readers))
             self._remove_reader(oldest_path)
 
-    def _remove_reader(self, path: str):
-        """移除指定的 reader"""
+    def _remove_reader(self, path: str) -> None:
+        """移除指定的 reader
+
+        Args:
+            path: 文件路径
+        """
         if path in self._readers:
             reader, _ = self._readers[path]
             # 获取缓存信息
@@ -151,7 +166,7 @@ class ReaderManager:
             )
             del self._readers[path]
 
-    def clear(self, file_path: Optional[str] = None):
+    def clear(self, file_path: Optional[str] = None) -> None:
         """
         清理缓存的 reader
 
@@ -169,8 +184,12 @@ class ReaderManager:
                 self._hits = 0
                 self._misses = 0
 
-    def get_stats(self) -> Dict:
-        """获取管理器统计信息"""
+    def get_stats(self) -> Dict[str, Any]:
+        """获取管理器统计信息
+
+        Returns:
+            包含统计信息的字典
+        """
         with self._lock:
             total_requests = self._hits + self._misses
             hit_rate = self._hits / total_requests if total_requests > 0 else 0
@@ -178,7 +197,7 @@ class ReaderManager:
             # 汇总所有 reader 的缓存信息
             total_cache_entries = 0
             total_cache_memory = 0
-            reader_details = []
+            reader_details: List[Dict[str, Any]] = []
 
             for path, (reader, last_used) in self._readers.items():
                 cache_info = reader.get_cache_info()
@@ -205,7 +224,7 @@ class ReaderManager:
 
 
 # 全局单例实例
-_reader_manager = ReaderManager()
+_reader_manager: ReaderManager = ReaderManager()
 
 
 def get_reader(file_path: str) -> ExcelReader:
@@ -221,17 +240,25 @@ def get_reader(file_path: str) -> ExcelReader:
     return _reader_manager.get_reader(file_path)
 
 
-def get_reader_stats() -> Dict:
-    """获取 reader 管理器统计信息（快捷函数）"""
+def get_reader_stats() -> Dict[str, Any]:
+    """获取 reader 管理器统计信息（快捷函数）
+
+    Returns:
+        包含统计信息的字典
+    """
     return _reader_manager.get_stats()
 
 
-def clear_reader(file_path: Optional[str] = None):
-    """清理缓存的 reader（快捷函数）"""
+def clear_reader(file_path: Optional[str] = None) -> None:
+    """清理缓存的 reader（快捷函数）
+
+    Args:
+        file_path: 指定文件路径，如果为 None 则清理所有
+    """
     _reader_manager.clear(file_path)
 
 
-def preload_files(file_paths: list[str], mode: str = "metadata") -> Dict:
+def preload_files(file_paths: List[str], mode: str = "metadata") -> Dict[str, Any]:
     """
     预加载多个文件到缓存
 
@@ -245,7 +272,7 @@ def preload_files(file_paths: list[str], mode: str = "metadata") -> Dict:
         预加载结果字典
     """
     import time
-    result = {
+    result: Dict[str, Any] = {
         "success": True,
         "mode": mode,
         "files": [],
@@ -271,7 +298,7 @@ def preload_files(file_paths: list[str], mode: str = "metadata") -> Dict:
                 # 注意：read_head 不经过缓存，但为保险起见清除缓存
                 reader.clear_cache()
 
-                file_result = {
+                file_result: Dict[str, Any] = {
                     "file_path": file_path,
                     "status": "loaded",
                     "mode": "metadata",
