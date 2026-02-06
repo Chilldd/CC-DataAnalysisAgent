@@ -750,24 +750,44 @@ class ExcelReader:
         aggregation: str,
         aggregate_column: str
     ) -> pd.DataFrame:
-        """分组聚合"""
+        """
+        分组聚合
+
+        支持的聚合函数:
+        - 基础统计: sum, avg, count, min, max
+        - 高级统计: median, std, var
+        - 位置值: first, last
+        - 基数统计: nunique
+        """
         agg_funcs = {
             "sum": "sum",
             "avg": "mean",
             "count": "count",
             "min": "min",
-            "max": "max"
+            "max": "max",
+            "median": "median",
+            "std": "std",
+            "var": "var",
+            "first": "first",
+            "last": "last",
+            "nunique": "nunique"
         }
 
         if aggregation not in agg_funcs:
-            raise ValueError(f"不支持的聚合函数: {aggregation}")
+            raise ValueError(
+                f"不支持的聚合函数: {aggregation}。"
+                f"支持的函数: {', '.join(agg_funcs.keys())}"
+            )
 
         agg_func = agg_funcs[aggregation]
 
-        if aggregation == "count":
+        # count 和 nunique 不需要指定聚合列
+        if aggregation in ("count", "nunique"):
             result = df.groupby(group_by).size().reset_index()
-            result.columns = [group_by, aggregate_column]
+            result.columns = [group_by, aggregate_column or aggregation]
         else:
+            if not aggregate_column:
+                raise ValueError(f"聚合函数 '{aggregation}' 需要指定 aggregate_column 参数")
             result = df.groupby(group_by)[aggregate_column].agg(agg_func).reset_index()
             result.columns = [group_by, aggregate_column]
 

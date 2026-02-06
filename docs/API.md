@@ -325,6 +325,22 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 | 新聚合函数 | `_group_and_aggregate` | 添加新的聚合函数 |
 | 新过滤操作符 | `_apply_filters` | 添加新的过滤操作符 |
 
+#### 支持的聚合函数 (v0.11.0)
+
+| 类别 | 函数 | 描述 | 是否需要 aggregate_column |
+|------|------|------|-------------------------|
+| 基础统计 | sum | 求和 | 是 |
+| | avg | 平均值 | 是 |
+| | count | 计数 | 否 (可选) |
+| | min | 最小值 | 是 |
+| | max | 最大值 | 是 |
+| 高级统计 | median | 中位数 | 是 |
+| | std | 标准差 | 是 |
+| | var | 方差 | 是 |
+| 位置值 | first | 第一个值 | 是 |
+| | last | 最后一个值 | 是 |
+| 基数统计 | nunique | 唯一值计数 | 否 (可选) |
+
 **添加文件格式**:
 ```python
 # 在 _read_file 方法中添加
@@ -338,8 +354,15 @@ elif suffix == '.parquet':
 agg_funcs = {
     "sum": "sum",
     "avg": "mean",
-    "median": "median",  # 新增
-    "std": "std"         # 新增
+    "count": "count",
+    "min": "min",
+    "max": "max",
+    "median": "median",  # v0.11.0 新增
+    "std": "std",        # v0.11.0 新增
+    "var": "var",        # v0.11.0 新增
+    "first": "first",    # v0.11.0 新增
+    "last": "last",      # v0.11.0 新增
+    "nunique": "nunique" # v0.11.0 新增
 }
 ```
 

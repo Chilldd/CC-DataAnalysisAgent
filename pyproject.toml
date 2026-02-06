@@ -1,6 +1,6 @@
 [project]
 name = "data-analysis-agent"
-version = "0.8.0"
+version = "0.11.0"
 description = "MCP Server for Excel data analysis and chart generation with TOON format support"
 requires-python = ">=3.10"
 dependencies = [

@@ -30,13 +30,13 @@ def _detect_encoding(self):
 
 ## 功能增强
 
-### 2. 扩展聚合函数 (P1)
+### 2. 扩展过滤操作符 (P1)
 
-**当前支持**: sum, avg, count, min, max
+**当前支持**: =, !=, >, <, >=, <=, contains
 
-**计划添加**: median, std, var, first, last, nunique
+**计划添加**: in, not_in, is_null, is_not_null, starts_with, ends_with, regex
 
-**位置**: `core/excel_reader.py:_group_and_aggregate`
+**位置**: `core/excel_reader.py:_apply_filters`
 
 ---
 
@@ -47,6 +47,20 @@ def _detect_encoding(self):
 **计划添加**: in, not_in, is_null, is_not_null, starts_with, ends_with, regex
 
 **位置**: `core/excel_reader.py:_apply_filters`
+
+---
+
+### 3.1 扩展聚合函数进阶 (P1)
+
+**当前支持**: sum, avg, count, min, max, median, std, var, first, last, nunique
+
+**计划添加**:
+- **百分位数**: quantile, percentile25, percentile75, percentile90
+- **模式统计**: mode (众数)
+- **累计聚合**: cumsum, cummax, cummin
+- **移动平均**: rolling_avg (支持窗口参数)
+
+**位置**: `core/excel_reader.py:_group_and_aggregate`
 
 ---
 
@@ -266,8 +280,8 @@ def _detect_encoding(self):
 | v0.9.0 | ✅ 已完成 | 缓存优化：标准化缓存键、智能缓存共享、批量查询 |
 | v0.8.0 | ✅ 已完成 | 日志系统增强：数据传输统计、性能监控 |
 | v0.6.0 | ✅ 已完成 | Token 优化：get_excel_schema、usecols 参数 |
-| v0.11.0 | 🚧 计划中 | CSV 编码检测、扩展聚合/过滤、类型注解 |
-| v0.12.0 | 📋 规划中 | 大文件优化、数据导出、更多格式支持 |
+| v0.11.0 | ✅ 已完成 | 扩展聚合函数：median, std, var, first, last, nunique |
+| v0.12.0 | 📋 规划中 | CSV 编码检测、扩展过滤操作符、类型注解 |
 | v1.0.0 | 🎯 长期目标 | 多文件关联、数据清洗、自定义主题、Docker |
 
 ---

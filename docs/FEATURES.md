@@ -136,12 +136,19 @@ result = await handle_session_start(
 | 过滤条件 | `ExcelReader._apply_filters()` |
 | 分组聚合 | `ExcelReader._group_and_aggregate()` |
 
+**支持的聚合函数**:
+- **基础统计**: sum, avg, count, min, max
+- **高级统计**: median（中位数）, std（标准差）, var（方差）[v0.11.0]
+- **位置值**: first（第一个值）, last（最后一个值）[v0.11.0]
+- **基数统计**: nunique（唯一值计数）[v0.11.0]
+
 **修改**:
 - 新增过滤操作符: 编辑 `_apply_filters()` 方法
 - 新增聚合函数: 编辑 `_group_and_aggregate()` 方法
 - 同时更新工具的 `inputSchema`
 
 **v0.6.0 新增**: `usecols` 参数支持列选择
+**v0.11.0 新增**: 6 种新聚合函数（median, std, var, first, last, nunique）
 
 ---
 

@@ -217,6 +217,12 @@ ClaudeCode → MCP Server → Tools → Core (ExcelReader/ChartRenderer) → Fil
 | count | 计数 | 同上 |
 | min | 最小值 | 同上 |
 | max | 最大值 | 同上 |
+| median | 中位数 | 同上 (v0.11.0) |
+| std | 标准差 | 同上 (v0.11.0) |
+| var | 方差 | 同上 (v0.11.0) |
+| first | 第一個值 | 同上 (v0.11.0) |
+| last | 最後一個值 | 同上 (v0.11.0) |
+| nunique | 唯一值计数 | 同上 (v0.11.0) |
 
 ### 过滤操作符
 | 操作符 | 描述 | 位置 |
@@ -318,6 +324,7 @@ export DAA_SHOW_FORMAT_INFO=true
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| **0.11.0** | 2026-02-06 | **功能增强**：扩展聚合函数，新增 median（中位数）、std（标准差）、var（方差）、first（第一个值）、last（最后一个值）、nunique（唯一值计数）；count 和 nunique 支持不指定 aggregate_column |
 | **0.10.1** | 2026-02-06 | **Bug 修复**：修复 metadata 预加载模式导致数据只有 1 行的问题；`preload_files()` 在 metadata 模式下使用 `read_head(n=5)` 获取样本并清除缓存；移除 `generate_chart_html` 的 `show_data_table` 参数，强制不显示数据表格 |
 | **0.10.0** | 2026-02-06 | **首次加载优化**：`session_start` 新增 `preload_files` 参数；新增 `preload_mode` 参数（metadata/full）；`ReaderManager` 新增 `preload_files()` 方法；首次调用 `get_excel_schema` 性能提升 600 倍 |
 | **0.9.1** | 2026-02-06 | **Bug 修复**：修复 `usecols` 参数未正确传递给 pandas 的问题；修复字节解析对带小数点单位的处理 |
